@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { APIPATH } from '../lib/api'
 import { Search, Filter, Trash2, Edit, Clock, Calendar, CheckCircle, Circle, PlayCircle } from 'lucide-react'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
@@ -56,7 +57,7 @@ export function TaskManager({ userId, onUpdateTask, onDeleteTask }: TaskManagerP
     if (!userId) return
     setLoading(true)
     try {
-      const response = await fetch(`http://localhost:8080/api/tasks/user/${userId}`)
+  const response = await fetch(APIPATH(`/api/tasks/user/${userId}`))
       if (!response.ok) throw new Error('Failed to fetch tasks')
       const data: any[] = await response.json()
       const mappedTasks = data.map(mapTaskToUI)
@@ -70,7 +71,7 @@ export function TaskManager({ userId, onUpdateTask, onDeleteTask }: TaskManagerP
       const classNamesMap: Record<number, string> = {}
       await Promise.all(classIds.map(async id => {
         try {
-          const res = await fetch(`http://localhost:8080/api/classes/${id}`)
+          const res = await fetch(APIPATH(`/api/classes/${id}`))
           if (!res.ok) return
           const cls = await res.json()
           classNamesMap[id] = cls.title
@@ -98,7 +99,7 @@ export function TaskManager({ userId, onUpdateTask, onDeleteTask }: TaskManagerP
 
   const handleStatusChange = async (taskId: number, newStatus: TaskForUI['status']) => {
     try {
-      const response = await fetch(`http://localhost:8080/api/tasks/${taskId}/state/${newStatus}`, {
+  const response = await fetch(APIPATH(`/api/tasks/${taskId}/state/${newStatus}`), {
         method: 'PATCH'
       });
       if (!response.ok) throw new Error('Failed to update task state');

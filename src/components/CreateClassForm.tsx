@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { APIPATH } from '../lib/api'
 import { ChevronLeft } from 'lucide-react'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
@@ -98,7 +99,7 @@ export function CreateClassForm({ onSubmit, onBack, userId, initialData }: Creat
         user: { id: userId },
       }
 
-      const res = await fetch(`http://localhost:8080/api/classes/user/${userId}`, {
+  const res = await fetch(APIPATH(`/api/classes/user/${userId}`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

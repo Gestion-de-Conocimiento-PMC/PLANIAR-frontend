@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { APIPATH } from '../lib/api'
 import { ChevronLeft, ChevronRight, Circle, Clock, CheckCircle2, AlertCircle } from 'lucide-react'
 import { Button } from './ui/button'
 import { Card, CardContent } from './ui/card'
@@ -74,7 +75,7 @@ export function WeeklyView({ userId }: WeeklyViewProps) {
         const dateStr = date.toISOString().split('T')[0]
 
         try {
-          const res = await fetch(`http://localhost:8080/api/tasks/user/${userId}/date/${dateStr}`)
+          const res = await fetch(APIPATH(`/api/tasks/user/${userId}/date/${dateStr}`))
           if (res.ok) {
             const dayTasks: TaskItem[] = await res.json()
             fetchedTasks.push(...dayTasks)
@@ -84,7 +85,7 @@ export function WeeklyView({ userId }: WeeklyViewProps) {
         }
 
         try {
-          const res = await fetch(`http://localhost:8080/api/activities/user/${userId}/date/${dateStr}`)
+          const res = await fetch(APIPATH(`/api/activities/user/${userId}/date/${dateStr}`))
           if (res.ok) {
             const dayActivities: ActivityItem[] = await res.json()
             fetchedActivities.push(...dayActivities)

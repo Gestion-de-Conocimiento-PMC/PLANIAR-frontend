@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { APIPATH } from '../lib/api'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Label } from './ui/label'
@@ -16,15 +17,13 @@ export function Login({ onLogin, onShowRegister }: LoginProps) {
   const [password, setPassword] = useState('')
   const [showUserNotFound, setShowUserNotFound] = useState(false)
   const [loading, setLoading] = useState(false)
-  const API_BASE = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8080'
-
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setShowUserNotFound(false)
     setLoading(true)
 
     try {
-      const response = await fetch(`${API_BASE}/api/users/login`, {
+  const response = await fetch(APIPATH('/api/users/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })

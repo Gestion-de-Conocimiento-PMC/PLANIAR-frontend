@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { APIPATH } from '../lib/api'
 import { Clock, Calendar, Target, Lightbulb } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
@@ -33,7 +34,7 @@ export function Dashboard({ userId, userName, onAddTask }: DashboardProps) {
     for (const date of weekDates) {
       try {
         const dateStr = date.toISOString().split('T')[0]
-        const res = await fetch(`http://localhost:8080/api/tasks/user/${userId}/date/${dateStr}`)
+        const res = await fetch(APIPATH(`/api/tasks/user/${userId}/date/${dateStr}`))
         if (res.ok) {
           const dayTasks = await res.json()
           allTasks.push(...dayTasks)

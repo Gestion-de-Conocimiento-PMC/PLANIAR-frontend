@@ -12,6 +12,7 @@ import { Register } from './components/Register'
 import { UserAvatar } from './components/UserAvatar'
 import { ImageWithFallback } from './components/figma/ImageWithFallback'
 import { AddEventModal } from './components/AddEventModal'
+import { APIPATH } from './lib/api'
 import { EditClassesDialog } from './components/EditClassesDialog'
 import { User, TaskActivity, ClassItem } from './types'
 
@@ -464,7 +465,7 @@ export default function App() {
     if (!user) return;
 
     try {
-      const response = await fetch(`http://localhost:8080/api/tasks/${taskId}`, {
+      const response = await fetch(APIPATH(`/api/tasks/${taskId}`), {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',

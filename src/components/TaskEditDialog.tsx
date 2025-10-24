@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { APIPATH } from '../lib/api'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Label } from './ui/label'
@@ -72,7 +73,7 @@ export function TaskEditDialog({ task, onUpdateTask, children, onRefresh }: Task
         state: formData.state
       }
 
-      const response = await fetch(`http://localhost:8080/api/tasks/${task.id}`, {
+  const response = await fetch(APIPATH(`/api/tasks/${task.id}`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

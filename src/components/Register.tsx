@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { APIPATH } from '../lib/api'
 import { CheckCircle } from 'lucide-react'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
@@ -17,8 +18,6 @@ export function Register({ onShowLogin }: RegisterProps) {
   const [error, setError] = useState('')
   const [showSuccess, setShowSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
-  const API_BASE = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8080'
-
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError('')
@@ -31,7 +30,7 @@ export function Register({ onShowLogin }: RegisterProps) {
     }
 
     try {
-      const response = await fetch(`${API_BASE}/api/users`, {
+  const response = await fetch(APIPATH('/api/users'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
