@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Calendar, CheckSquare, BarChart3, Plus } from 'lucide-react'
 import { Button } from './components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './components/ui/tabs'
@@ -520,6 +520,12 @@ export default function App() {
     // Normalize backend response: some APIs return { user: { ... } }
     const normalized = userData && userData.user ? userData.user : userData
     setUser(normalized)
+    try {
+      localStorage.setItem('planiar_user', JSON.stringify(normalized))
+      localStorage.setItem('planiar_logged_in', '1')
+    } catch (e) {
+      console.warn('Failed to persist user to localStorage', e)
+    }
     setIsLoggedIn(true)
     setShowRegister(false)
   }
@@ -535,6 +541,12 @@ export default function App() {
     
     setUsers([...users, newUser])
     setUser(newUser)
+    try {
+      localStorage.setItem('planiar_user', JSON.stringify(newUser))
+      localStorage.setItem('planiar_logged_in', '1')
+    } catch (e) {
+      console.warn('Failed to persist user to localStorage', e)
+    }
     setIsLoggedIn(true)
     setShowRegister(false)
   }
@@ -544,7 +556,27 @@ export default function App() {
     setIsLoggedIn(false)
     setShowRegister(false)
     setActiveTab('dashboard')
+    try {
+      localStorage.removeItem('planiar_user')
+      localStorage.removeItem('planiar_logged_in')
+    } catch (e) {
+      console.warn('Failed to clear localStorage on logout', e)
+    }
   }
+
+  // On mount, restore user from localStorage if present
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('planiar_user')
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        setUser(parsed)
+        setIsLoggedIn(true)
+      }
+    } catch (e) {
+      console.warn('Failed to restore user from localStorage', e)
+    }
+  }, [])
 
   // Show login/register screen if not logged in
   if (!isLoggedIn) {
@@ -633,6 +665,7 @@ export default function App() {
               userId={user?.id}
               userName={user?.name || ''}
               onAddTask={() => setIsAddEventOpen(true)}
+              initialTasks={userTasks}
             />
           </TabsContent>
 

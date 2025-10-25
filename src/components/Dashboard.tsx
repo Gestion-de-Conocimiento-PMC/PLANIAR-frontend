@@ -10,14 +10,19 @@ interface DashboardProps {
   userId: number | undefined
   userName: string
   onAddTask: () => void
+  initialTasks?: TaskActivity[]
 }
 
-export function Dashboard({ userId, userName, onAddTask }: DashboardProps) {
+export function Dashboard({ userId, userName, onAddTask, initialTasks }: DashboardProps) {
   const [tasks, setTasks] = useState<TaskActivity[]>([])
   const [loading, setLoading] = useState(false)
 
   const fetchTasksForWeek = async () => {
-    if (!userId) return
+    if (!userId) {
+      // If no backend id is available (local mock data), fall back to provided initial tasks
+      if (initialTasks) setTasks(initialTasks)
+      return
+    }
     setLoading(true)
 
     const today = new Date()

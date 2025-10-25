@@ -5,15 +5,20 @@ interface TaskBlockProps {
   startHour: number
   duration: number
   heightPerHour: number
+  onClick?: (e?: any) => void
 }
 
-export function TaskBlock({ taskData, startHour, duration, heightPerHour }: TaskBlockProps) {
+export function TaskBlock({ taskData, startHour, duration, heightPerHour, onClick }: TaskBlockProps) {
   const height = Math.max(duration * heightPerHour, 50) // Minimum 50px
   const color = '#7B61FF' // Use purple for all tasks (no color differentiation)
 
   return (
     <div
       className="mx-2 mb-1 rounded-lg border transition-all shadow-sm"
+      onClick={(e) => { e.stopPropagation(); onClick?.(e as any) }}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onClick?.(e as any) } }}
       style={{
         height: `${height}px`,
         backgroundColor: `${color}15`,

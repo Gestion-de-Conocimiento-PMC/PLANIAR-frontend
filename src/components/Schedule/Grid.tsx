@@ -156,6 +156,12 @@ export function ScheduleGrid({ weekDates, userId, onUpdateClass, onDeleteClass, 
     setIsClassDetailOpen(true)
   }
 
+  const handleTaskClick = (task: any) => {
+    // Reuse the same dialog for simplicity; it will display available fields.
+    setSelectedClass(task)
+    setIsClassDetailOpen(true)
+  }
+
   const handleEditClass = () => {
     setIsClassDetailOpen(false)
     if (onEditClasses) onEditClasses()
@@ -221,6 +227,7 @@ export function ScheduleGrid({ weekDates, userId, onUpdateClass, onDeleteClass, 
                                     startHour={item.startHour} 
                                     duration={item.duration} 
                                     heightPerHour={heightPerHour} 
+                                    onClick={() => handleTaskClick(item)}
                                   />}
                               </div>
                             )
