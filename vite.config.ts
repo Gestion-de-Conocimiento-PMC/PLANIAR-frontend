@@ -57,5 +57,17 @@
     server: {
       port: 3000,
       open: true,
+      // During local development we proxy API calls under /api to the
+      // Railway backend so the browser doesn't block requests due to CORS.
+      // This proxy runs only on the dev server and does not affect production builds.
+      proxy: {
+        '/api': {
+          target: 'https://planiar-backend-production.up.railway.app',
+          changeOrigin: true,
+          secure: true,
+          // keep the path as-is; the backend expects /api/...
+          rewrite: (path) => path,
+        },
+      },
     },
   });

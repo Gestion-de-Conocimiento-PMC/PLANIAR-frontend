@@ -465,7 +465,7 @@ export default function App() {
     if (!user) return;
 
     try {
-      const response = await fetch(APIPATH(`/api/tasks/${taskId}`), {
+  const response = await fetch(APIPATH(`/tasks/${taskId}`), {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -517,7 +517,9 @@ export default function App() {
   }
 
   const handleLogin = (userData: any) => {
-    setUser(userData)
+    // Normalize backend response: some APIs return { user: { ... } }
+    const normalized = userData && userData.user ? userData.user : userData
+    setUser(normalized)
     setIsLoggedIn(true)
     setShowRegister(false)
   }

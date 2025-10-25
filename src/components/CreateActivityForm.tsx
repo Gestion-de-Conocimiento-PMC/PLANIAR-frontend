@@ -110,7 +110,7 @@ export function CreateActivityForm({ onSubmit, onBack, userId, initialData }: Cr
         user: { id: userId }
       }
 
-  const res = await fetch(APIPATH(`/api/activities/user/${userId}`), {
+  const res = await fetch(APIPATH(`/activities/user/${userId}`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

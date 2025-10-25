@@ -34,7 +34,7 @@ export function Dashboard({ userId, userName, onAddTask }: DashboardProps) {
     for (const date of weekDates) {
       try {
         const dateStr = date.toISOString().split('T')[0]
-        const res = await fetch(APIPATH(`/api/tasks/user/${userId}/date/${dateStr}`))
+  const res = await fetch(APIPATH(`/tasks/user/${userId}/date/${dateStr}`))
         if (res.ok) {
           const dayTasks = await res.json()
           allTasks.push(...dayTasks)

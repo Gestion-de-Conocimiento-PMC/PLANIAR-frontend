@@ -73,7 +73,7 @@ export function TaskEditDialog({ task, onUpdateTask, children, onRefresh }: Task
         state: formData.state
       }
 
-  const response = await fetch(APIPATH(`/api/tasks/${task.id}`), {
+  const response = await fetch(APIPATH(`/tasks/${task.id}`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

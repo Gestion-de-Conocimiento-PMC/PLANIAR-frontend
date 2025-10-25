@@ -99,7 +99,7 @@ export function CreateClassForm({ onSubmit, onBack, userId, initialData }: Creat
         user: { id: userId },
       }
 
-  const res = await fetch(APIPATH(`/api/classes/user/${userId}`), {
+  const res = await fetch(APIPATH(`/classes/user/${userId}`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

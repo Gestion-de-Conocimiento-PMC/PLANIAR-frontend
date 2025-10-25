@@ -3,8 +3,7 @@ import { Card, CardContent } from '../ui/card'
 import { ClassBlock } from './ClassBlock'
 import { TaskBlock } from './TaskBlock'
 import { ClassDetailDialog } from '../ClassDetailDialog'
-
-const API_BASE = (import.meta as any).env?.VITE_API_URL || ''
+import { APIPATH } from '../../lib/api'
 
 interface ScheduleGridProps {
   weekDates: Date[]
@@ -72,8 +71,8 @@ export function ScheduleGrid({ weekDates, userId, onUpdateClass, onDeleteClass, 
           .slice(0, 10)
         try {
           const [classesRes, activitiesRes] = await Promise.all([
-            fetch(`${API_BASE}/api/classes/user/${userId}/date/${dateStr}`),
-            fetch(`${API_BASE}/api/activities/user/${userId}/date/${dateStr}`)
+            fetch(APIPATH(`/classes/user/${userId}/date/${dateStr}`)),
+            fetch(APIPATH(`/activities/user/${userId}/date/${dateStr}`))
           ])
           if (classesRes.ok) {
             const dayClasses = await classesRes.json()

@@ -38,7 +38,7 @@ export function CreateTaskFormImproved({ onSubmit, onBack, userId }: CreateTaskF
     const fetchClasses = async () => {
       if (!userId) return
       try {
-  const res = await fetch(APIPATH(`/api/classes/user/${userId}`))
+  const res = await fetch(APIPATH(`/classes/user/${userId}`))
         if (!res.ok) throw new Error('Failed to fetch classes')
         const data: ClassData[] = await res.json()
         setClasses(data)
@@ -79,7 +79,7 @@ export function CreateTaskFormImproved({ onSubmit, onBack, userId }: CreateTaskF
         user: { id: userId },
       }
 
-  const response = await fetch(APIPATH(`/api/tasks/user/${userId}`), {
+  const response = await fetch(APIPATH(`/tasks/user/${userId}`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(taskPayload),

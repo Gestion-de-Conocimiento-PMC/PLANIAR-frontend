@@ -13,7 +13,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { useState } from 'react'
 
 interface UserAvatarProps {
-  user: { name: string; email?: string } | null
+  // Accept flexible user shape returned by backend: may contain `name`, `username`, `email`, etc.
+  user: { name?: string; username?: string; email?: string } | null
   onLogout: () => void
   onEditClasses: () => void
 }
@@ -22,7 +23,25 @@ export function UserAvatar({ user, onLogout, onEditClasses }: UserAvatarProps) {
   const [showProfile, setShowProfile] = useState(false)
   const [showOptions, setShowOptions] = useState(false)
 
-  const initials = user?.name ? user.name.substring(0, 2).toUpperCase() : 'US'
+  // Derive a human-friendly display name and initials with fallbacks.
+  const displayName = (() => {
+    if (!user) return 'User'
+    if (user.name && user.name.trim().length > 0) return user.name.trim()
+    if (user.username && user.username.trim().length > 0) return user.username.trim()
+    if (user.email && user.email.trim().length > 0) return user.email.split('@')[0]
+    return 'User'
+  })()
+
+  const initials = (() => {
+    const name = displayName
+    // If name contains spaces, take first letter of first two words
+    const parts = name.split(/\s+/).filter(Boolean)
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase()
+    }
+    // Single word: take up to first two characters
+    return name.slice(0, 2).toUpperCase()
+  })()
 
   return (
     <>
@@ -34,13 +53,13 @@ export function UserAvatar({ user, onLogout, onEditClasses }: UserAvatarProps) {
                 {initials}
               </AvatarFallback>
             </Avatar>
-            <span className="hidden sm:inline text-sm font-medium max-w-[140px] truncate">{user?.name || 'User'}</span>
+            <span className="hidden sm:inline text-sm font-medium max-w-[140px] truncate">{displayName}</span>
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent className="w-56" align="end" forceMount>
           <DropdownMenuLabel className="font-normal">
             <div className="flex flex-col space-y-1">
-              <p className="text-sm leading-none">{user?.name || 'User'}</p>
+              <p className="text-sm leading-none">{displayName}</p>
               <p className="text-xs leading-none text-muted-foreground">
                 {user?.email || 'user@example.com'}
               </p>
@@ -75,7 +94,7 @@ export function UserAvatar({ user, onLogout, onEditClasses }: UserAvatarProps) {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <label className="text-sm">Name</label>
-              <p className="text-base">{user?.name || 'User'}</p>
+              <p className="text-base">{displayName}</p>
             </div>
             <div className="space-y-2">
               <label className="text-sm">Email</label>
