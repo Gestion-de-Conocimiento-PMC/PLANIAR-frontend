@@ -15,12 +15,20 @@ interface DashboardProps {
 
 export function Dashboard({ userId, userName, onAddTask, initialTasks }: DashboardProps) {
   const [tasks, setTasks] = useState<TaskActivity[]>([])
+  const [lifetimeTasks, setLifetimeTasks] = useState<TaskActivity[]>([])
   const [loading, setLoading] = useState(false)
 
   const fetchTasksForWeek = async () => {
     if (!userId) {
       // If no backend id is available (local mock data), fall back to provided initial tasks
-      if (initialTasks) setTasks(initialTasks)
+      if (initialTasks) {
+        // Normalize numeric fields to avoid NaN when reducing
+        const normalized = initialTasks.map(t => ({
+          ...t,
+          estimatedTime: Number((t as any).estimatedTime) || 0,
+        }))
+        setTasks(normalized)
+      }
       return
     }
     setLoading(true)
@@ -49,30 +57,82 @@ export function Dashboard({ userId, userName, onAddTask, initialTasks }: Dashboa
       }
     }
 
-    setTasks(allTasks)
+    // Normalize numeric fields coming from the API as well
+    const normalized = allTasks.map(t => ({
+      ...t,
+      estimatedTime: Number((t as any).estimatedTime) || 0,
+    }))
+
+    setTasks(normalized)
+    // Try to fetch lifetime / all tasks for better lifetime metrics. If the
+    // endpoint doesn't exist or fails, fall back to the week-limited list.
+    try {
+      const allRes = await fetch(APIPATH(`/tasks/user/${userId}`))
+      if (allRes.ok) {
+        const allData = await allRes.json()
+        const normalizedAll = (allData || []).map((t: any) => ({
+          ...t,
+          estimatedTime: Number(t.estimatedTime) || 0,
+        }))
+        setLifetimeTasks(normalizedAll)
+      } else {
+        // fallback
+        setLifetimeTasks(normalized)
+      }
+    } catch (e) {
+      setLifetimeTasks(normalized)
+    }
     setLoading(false)
   }
 
+  // Re-run when userId OR provided initialTasks change. This ensures the
+  // dashboard shows local/mock tasks (passed via `initialTasks`) even when
+  // there's no backend `userId` available (e.g. local dev mode).
   useEffect(() => {
     fetchTasksForWeek()
-  }, [userId])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, initialTasks])
 
   // Analytics
   const totalTasks = tasks.length
   const completedTasks = tasks.filter(t => t.status === 'completed').length
   const completionRate = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0
   const highPriorityTasks = tasks.filter(t => t.priority === 'high' && t.status !== 'completed')
-  const thisWeekTasks = tasks.filter(t => {
-    const due = new Date(t.dueDate)
-    const now = new Date()
-    const weekStart = new Date(now)
-    weekStart.setDate(now.getDate() - now.getDay())
+
+  // Lifetime metrics (from lifetimeTasks state)
+  const totalLifetime = lifetimeTasks.length
+  const completedLifetime = lifetimeTasks.filter(t => t.status === 'completed').length
+  const lifetimeCompletionRate = totalLifetime > 0 ? (completedLifetime / totalLifetime) * 100 : 0
+  const totalLifetimeEstimatedMinutes = lifetimeTasks.reduce((sum, t) => sum + (Number((t as any).estimatedTime) || 0), 0)
+
+  // Helpers for date handling in local timezone (avoid TZ-shifts when parsing ISO strings)
+  const parseYMD = (d?: string | undefined) => {
+    if (!d) return null
+    const parts = String(d).split('-').map(Number)
+    if (parts.length < 3) return null
+    return new Date(parts[0], parts[1] - 1, parts[2])
+  }
+
+  const getWeekRange = (ref = new Date()) => {
+    const weekStart = new Date(ref)
+    weekStart.setDate(ref.getDate() - ref.getDay()) // Sunday
+    weekStart.setHours(0, 0, 0, 0)
     const weekEnd = new Date(weekStart)
     weekEnd.setDate(weekEnd.getDate() + 6)
+    weekEnd.setHours(23, 59, 59, 999)
+    return { weekStart, weekEnd }
+  }
+
+  const { weekStart, weekEnd } = getWeekRange()
+
+  const thisWeekTasks = tasks.filter(t => {
+    const due = parseYMD((t as any).dueDate)
+    if (!due) return false
     return due >= weekStart && due <= weekEnd
   })
+
   const averageTaskTime = totalTasks > 0
-    ? tasks.reduce((sum, t) => sum + t.estimatedTime, 0) / totalTasks
+    ? tasks.reduce((sum, t) => sum + (Number((t as any).estimatedTime) || 0), 0) / totalTasks
     : 0
 
   const formatTime = (minutes: number) => {
@@ -81,9 +141,13 @@ export function Dashboard({ userId, userName, onAddTask, initialTasks }: Dashboa
     return h > 0 ? `${h}h ${m}m` : `${m}m`
   }
 
+  const todayStart = new Date()
+  todayStart.setHours(0, 0, 0, 0)
   const overdueTasks = tasks.filter(t => {
-    const todayStr = new Date().toISOString().split('T')[0]
-    return t.status !== 'completed' && t.dueDate < todayStr
+    if (t.status === 'completed') return false
+    const due = parseYMD((t as any).dueDate)
+    if (!due) return false
+    return due < todayStart
   })
 
   const getProductivityRecommendations = () => {
@@ -122,13 +186,37 @@ export function Dashboard({ userId, userName, onAddTask, initialTasks }: Dashboa
 
       {loading && <div className="p-4 text-center text-muted-foreground">Loading tasks...</div>}
 
-      {!loading && tasks.length === 0 && (
+      {/* Consider the week tasks and lifetime tasks when deciding empty state */}
+      {!loading && thisWeekTasks.length === 0 && lifetimeTasks.length === 0 && (
         <EmptyState onAddTask={onAddTask} userName={userName} />
       )}
 
-      {!loading && tasks.length > 0 && (
+      {!loading && (thisWeekTasks.length > 0 || lifetimeTasks.length > 0) && (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Lifetime summary card */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Lifetime Progress</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-lg font-semibold">{totalLifetime}</div>
+                      <div className="text-xs text-muted-foreground">Total tasks</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-lg font-semibold">{completedLifetime}</div>
+                      <div className="text-xs text-muted-foreground">Completed</div>
+                    </div>
+                  </div>
+                  <div className="text-sm text-muted-foreground">Total time: {formatTime(totalLifetimeEstimatedMinutes)}</div>
+                  <div className="text-sm text-muted-foreground">Lifetime completion: {Math.round(lifetimeCompletionRate)}%</div>
+                </div>
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader>
                 <CardTitle>Average Task Duration</CardTitle>
