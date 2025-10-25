@@ -26,5 +26,17 @@ export const APIPATH = (p: string) => {
 	// return the path so we don't create '/api/api/...'.
 	if (base === '/api' && path.startsWith('/api')) return path;
 
+	// If base is an absolute URL but doesn't include the '/api' prefix, and the
+	// requested path doesn't include it either, insert '/api' between them.
+	// This makes the function tolerant to a Vercel env that sets VITE_API_URL
+	// to 'https://host' instead of 'https://host/api'.
+	const isAbsolute = /^https?:\/\//i.test(base);
+	if (isAbsolute && !base.endsWith('/api') && !path.startsWith('/api')) {
+		return base + '/api' + path;
+	}
+
+	// If base is absolute and path already starts with /api, just concatenate.
+	if (isAbsolute && path.startsWith('/api')) return base + path;
+
 	return base + path;
 };
