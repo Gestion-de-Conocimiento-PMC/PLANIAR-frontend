@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
 import { DialogHeader, DialogTitle, DialogDescription } from './ui/dialog'
 import { Badge } from './ui/badge'
 import { AIUploadView } from './AIUploadView'
+import { ICS_TUTORIAL_URL } from '../lib/config'
 
 // Constantes de colores y días de la semana
 const PRESET_COLORS = [
@@ -47,7 +48,7 @@ export function CreateClassForm({ onSubmit, onBack, userId, initialData }: Creat
   const [selectedColor, setSelectedColor] = useState(initialData?.color || PRESET_COLORS[0].value)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
-  const [inputMode, setInputMode] = useState<'manual' | 'ai'>('manual')
+  const [inputMode, setInputMode] = useState<'manual' | 'ics'>('manual')
 
   const handleDayToggle = (dayId: number) => {
     setSelectedDays((prev) =>
@@ -143,14 +144,77 @@ export function CreateClassForm({ onSubmit, onBack, userId, initialData }: Creat
         </div>
       </DialogHeader>
 
-      {/* Manual / AI Tabs */}
+      {/* Manual / ICS Tabs */}
       <Tabs value={inputMode} onValueChange={(v: any) => setInputMode(v)} className="mt-4">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="manual">Manual</TabsTrigger>
-          <TabsTrigger value="ai">AI</TabsTrigger>
+          <TabsTrigger value="ics">ics</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="ai" className="mt-4">
+        <TabsContent value="ics" className="mt-4 space-y-4">
+          {ICS_TUTORIAL_URL ? (
+            (() => {
+              const url = ICS_TUTORIAL_URL.trim()
+              const isYouTube = /(?:youtube\.com|youtu\.be)/i.test(url)
+              if (isYouTube) {
+                // Normalize to embed URL
+                let videoId = ''
+                try {
+                  if (url.includes('youtu.be/')) {
+                    videoId = url.split('youtu.be/')[1].split(/[?&]/)[0]
+                  } else if (url.includes('watch?v=')) {
+                    const params = new URL(url).searchParams
+                    videoId = params.get('v') || ''
+                  } else {
+                    // Fallback: try to extract last path segment
+                    const parts = new URL(url).pathname.split('/')
+                    videoId = parts.pop() || ''
+                  }
+                } catch (e) {
+                  // Fallback naive parsing
+                  const m = url.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]+)/)
+                  videoId = m ? m[1] : ''
+                }
+                const embedSrc = videoId ? `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&controls=1&rel=0` : url
+                return (
+                  <div className="mb-4">
+                    <p className="text-sm text-muted-foreground mb-2">Tutorial: how to obtain your classes ICS</p>
+                    <div className="w-full rounded overflow-hidden bg-black">
+                      <iframe
+                        src={embedSrc}
+                        title="ICS import tutorial"
+                        className="w-full h-[360px] bg-black border-0"
+                        allow="autoplay; encrypted-media; fullscreen"
+                        allowFullScreen
+                      />
+                    </div>
+                  </div>
+                )
+              }
+
+              // Non-YouTube source: use native video element (autoplay muted)
+              return (
+                <div className="mb-4">
+                  <p className="text-sm text-muted-foreground mb-2">Tutorial: how to obtain your classes ICS</p>
+                  <div className="w-full rounded overflow-hidden bg-black">
+                    <video
+                      src={url}
+                      controls
+                      autoPlay
+                      muted
+                      playsInline
+                      className="w-full h-auto max-h-[360px] bg-black"
+                    >
+                      Your browser does not support the video tag.
+                    </video>
+                  </div>
+                </div>
+              )
+            })()
+          ) : (
+            <div className="mb-4 text-sm text-muted-foreground">Upload classes with a ICS file — tutorial soon...</div>
+          )}
+
           <AIUploadView
             onAnalysisComplete={handleAIAnalysis}
             analysisType="class"

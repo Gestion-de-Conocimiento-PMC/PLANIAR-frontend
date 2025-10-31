@@ -40,6 +40,37 @@ export function ClassDetailDialog({
 
   if (!classData) return null
 
+  // Normalize days into an array of day keys like ['monday','tuesday']
+  const DAYS_ORDER = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday']
+  const normalizedDays: string[] = (() => {
+    const d = (classData as any).days
+    if (!d) return []
+    if (Array.isArray(d)) return d
+    const s = String(d).trim()
+    // Bitmask like '1,0,1,0,1,0,0' or '1010100'
+    if (/^[01](?:,?[01])*$/.test(s)) {
+      const parts = s.includes(',') ? s.split(',') : s.split('')
+      return parts.map((v,i) => v === '1' ? DAYS_ORDER[i] : null).filter(Boolean) as string[]
+    }
+    // Comma-separated day names: 'monday,tuesday'
+    if (s.includes(',')) return s.split(',').map(x => x.trim()).filter(Boolean)
+    // Single day name
+    return [s]
+  })()
+
+  // Normalize dayTimes: accept object { monday: {start,end} } OR startTimes/endTimes csv strings
+  let dayTimesObj: Record<string, any> | undefined = (classData as any).dayTimes
+  if (!dayTimesObj && (classData as any).startTimes && (classData as any).endTimes) {
+    const starts = String((classData as any).startTimes).split(',')
+    const ends = String((classData as any).endTimes).split(',')
+    dayTimesObj = {}
+    DAYS_ORDER.forEach((day, i) => {
+      const st = (starts[i] || '').trim()
+      const en = (ends[i] || '').trim()
+      if (st && en) dayTimesObj![day] = { start: st, end: en }
+    })
+  }
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -56,7 +87,7 @@ export function ClassDetailDialog({
 
           <div className="space-y-4 py-4">
             <div>
-              <Badge variant="secondary">Class</Badge>
+              <Badge variant="secondary">{classData.itemType === 'class' ? 'Class' : 'Activity'}</Badge>
             </div>
 
             {classData.professor && (
@@ -79,28 +110,28 @@ export function ClassDetailDialog({
               </div>
             )}
 
-            {classData.days && classData.days.length > 0 && (
+            {normalizedDays.length > 0 && (
               <div>
                 <p className="text-sm text-muted-foreground mb-2">Days</p>
                 <div className="flex flex-wrap gap-2">
-                  {classData.days.map((day: string) => (
+                  {normalizedDays.map((day: string) => (
                     <Badge key={day} variant="secondary">
-                      {DAYS_MAP[day]}
+                      {DAYS_MAP[day] ?? day}
                     </Badge>
                   ))}
                 </div>
               </div>
             )}
 
-            {classData.dayTimes && Object.keys(classData.dayTimes).length > 0 && (
+            {dayTimesObj && Object.keys(dayTimesObj).length > 0 && (
               <div>
                 <p className="text-sm text-muted-foreground mb-2">Schedule</p>
                 <div className="space-y-2">
-                  {Object.entries(classData.dayTimes).map(([day, times]: [string, any]) => (
+                  {Object.entries(dayTimesObj).map(([day, times]: [string, any]) => (
                     <div key={day} className="flex items-center gap-2">
                       <Clock className="w-4 h-4 text-muted-foreground" />
                       <span className="text-sm">
-                        <span className="font-medium">{DAYS_MAP[day]}:</span>{' '}
+                        <span className="font-medium">{DAYS_MAP[day] ?? day}:</span>{' '}
                         {times.start} - {times.end}
                       </span>
                     </div>

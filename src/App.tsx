@@ -681,6 +681,8 @@ export default function App() {
               onUpdateClass={updateClass}
               onDeleteClass={deleteClass}
               onEditClasses={() => setIsEditClassesOpen(true)}
+              existingClasses={userClasses}
+              existingActivities={userTasks}
             />
           </TabsContent>
 

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Circle, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Circle, ChevronLeft, ChevronRight, Edit } from 'lucide-react'
 import { Button } from '../ui/button'
 import { ScheduleHeader } from '../Schedule/Header'
 import { ScheduleGrid } from '../Schedule/Grid'
@@ -10,13 +10,17 @@ interface ScheduleProps {
   onUpdateClass?: (id: string, updates: any) => void
   onDeleteClass?: (id: string) => void
   onEditClasses?: () => void
+  existingClasses?: any[]
+  existingActivities?: any[]
 }
 
 export function Schedule({ 
   userId, 
   onUpdateClass, 
   onDeleteClass,
-  onEditClasses 
+  onEditClasses,
+  existingClasses,
+  existingActivities
 }: ScheduleProps) {
   // State for current week's Monday
   const [currentWeekStart, setCurrentWeekStart] = useState(() => {
@@ -79,13 +83,25 @@ export function Schedule({
           </Button>
         </div>
 
-        <Button
-          onClick={goToCurrentWeek}
-          className="gap-2 bg-[#7C3AED] hover:bg-[#6D28D9] text-white border-0"
-        >
-          <Circle className="w-4 h-4" />
-          Today
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={goToCurrentWeek}
+            className="gap-2 bg-[#7C3AED] hover:bg-[#6D28D9] text-white border-0"
+          >
+            <Circle className="w-4 h-4" />
+            Today
+          </Button>
+
+          {/* Manage Classes - opens EditClassesDialog via prop */}
+          <Button
+            onClick={() => onEditClasses && onEditClasses()}
+            className="gap-2 bg-[#7B61FF] hover:bg-[#6D28D9] text-white border-0"
+            title="Manage Classes"
+          >
+            <Edit className="w-4 h-4 text-white" />
+            <span className="hidden sm:inline">Manage Classes</span>
+          </Button>
+        </div>
       </div>
 
       {/* Schedule Grid (solo la semana visible) */}
@@ -95,6 +111,8 @@ export function Schedule({
         onUpdateClass={onUpdateClass}
         onDeleteClass={onDeleteClass}
         onEditClasses={onEditClasses}
+        existingClasses={existingClasses}
+        existingActivities={existingActivities}
       />
 
       {/* Legend */}

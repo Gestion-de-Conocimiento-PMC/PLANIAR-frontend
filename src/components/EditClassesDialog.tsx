@@ -40,8 +40,9 @@ export function EditClassesDialog({
   const [deletingClassId, setDeletingClassId] = useState<string | null>(null)
   const [showCreateForm, setShowCreateForm] = useState(false)
 
-  const filteredClasses = classes.filter(cls =>
-    cls.title.toLowerCase().includes(searchQuery.toLowerCase())
+  const safeClasses = classes ?? []
+  const filteredClasses = safeClasses.filter(cls =>
+    (cls?.title || '').toLowerCase().includes(searchQuery.toLowerCase())
   )
 
   const handleEdit = (cls: any) => {
@@ -89,6 +90,7 @@ export function EditClassesDialog({
             <CreateClassForm
               onSubmit={handleCreateSubmit}
               onBack={() => setShowCreateForm(false)}
+              userId={null}
             />
           </div>
         </DialogContent>
@@ -115,6 +117,7 @@ export function EditClassesDialog({
               onSubmit={handleEditSubmit}
               onBack={() => setEditingClass(null)}
               initialData={editingClass}
+              userId={editingClass?.userId ?? null}
             />
           </div>
         </DialogContent>
@@ -194,11 +197,11 @@ export function EditClassesDialog({
                         </div>
 
                         <div className="flex flex-wrap gap-2 text-sm">
-                          {cls.days && cls.days.length > 0 && (
+                          {Array.isArray(cls.days) && cls.days.length > 0 && (
                             <div className="flex gap-1">
                               {cls.days.map((day: string) => (
                                 <Badge key={day} variant="secondary" className="text-xs">
-                                  {DAYS_MAP[day]}
+                                  {DAYS_MAP[day] || day}
                                 </Badge>
                               ))}
                             </div>

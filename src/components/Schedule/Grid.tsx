@@ -11,9 +11,12 @@ interface ScheduleGridProps {
   onUpdateClass?: (id: string, updates: any) => void
   onDeleteClass?: (id: string) => void
   onEditClasses?: () => void
+  // For local/mock mode (no userId) the parent can pass existing classes/activities
+  existingClasses?: any[]
+  existingActivities?: any[]
 }
 
-export function ScheduleGrid({ weekDates, userId, onUpdateClass, onDeleteClass, onEditClasses }: ScheduleGridProps) {
+export function ScheduleGrid({ weekDates, userId, onUpdateClass, onDeleteClass, onEditClasses, existingClasses, existingActivities }: ScheduleGridProps) {
   const [classes, setClasses] = useState<any[]>([])
   const [activities, setActivities] = useState<any[]>([])
   const [selectedClass, setSelectedClass] = useState<any>(null)
@@ -25,6 +28,7 @@ export function ScheduleGrid({ weekDates, userId, onUpdateClass, onDeleteClass, 
 
   const hours = Array.from({ length: 24 }, (_, i) => i)
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  const DAYS_ORDER = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday']
   const heightPerHour = 60
 
   const parseTime = (timeStr: string) => {
@@ -57,7 +61,21 @@ export function ScheduleGrid({ weekDates, userId, onUpdateClass, onDeleteClass, 
 
   // Fetch clases y actividades por fecha
   useEffect(() => {
-    if (!userId) return
+    // If running in local/mock mode (no backend userId), use provided existing data.
+    if (!userId) {
+      if (existingClasses) setClasses(existingClasses)
+      if (existingActivities) setActivities(existingActivities)
+      setLoading(false)
+      // Scroll to today
+      if (scrollContainerRef.current) {
+        const todayIndex = weekDates.findIndex(d => isToday(d))
+        if (todayIndex >= 0) {
+          const cardWidth = 320
+          scrollContainerRef.current.scrollTo({ left: cardWidth * todayIndex, behavior: 'smooth' })
+        }
+      }
+      return
+    }
 
     const fetchWeekData = async () => {
       setLoading(true)
@@ -108,20 +126,60 @@ export function ScheduleGrid({ weekDates, userId, onUpdateClass, onDeleteClass, 
     const items: any[] = []
     const dayIndex = date.getDay() // domingo=0
 
-    // Clases
+    // Clases (support multiple shapes: dayTimes object, days array, or bitmask/csv)
     classes.forEach(cls => {
-      if (!cls.days) return
-      const isActive = cls.days.split(',')[dayIndex] === '1'
+      const dayKey = DAYS_ORDER[dayIndex]
+
+      let isActive = false
+      let startTimeStr: string | undefined
+      let endTimeStr: string | undefined
+
+      // If class has dayTimes object (preferred)
+      if (cls.dayTimes && typeof cls.dayTimes === 'object') {
+        const times = cls.dayTimes[dayKey]
+        if (times && times.start && times.end) {
+          isActive = true
+          startTimeStr = times.start
+          endTimeStr = times.end
+        }
+      }
+
+      // If days is an array of day keys like ['monday','wednesday']
+      if (!isActive && Array.isArray(cls.days)) {
+        const normalized = cls.days.map((d: any) => String(d).toLowerCase())
+        if (normalized.includes(dayKey)) {
+          isActive = true
+          // try to get times from dayTimes if present
+          if (cls.dayTimes && cls.dayTimes[dayKey]) {
+            startTimeStr = cls.dayTimes[dayKey].start
+            endTimeStr = cls.dayTimes[dayKey].end
+          }
+        }
+      }
+
+      // Fallback: days as bitmask or csv of 0/1 and startTimes/endTimes as csv strings
+      if (!isActive && cls.days && typeof cls.days === 'string') {
+        const s = String(cls.days).trim()
+        if (/^[01](?:,?[01])*$/.test(s)) {
+          const parts = s.includes(',') ? s.split(',') : s.split('')
+          if (parts[dayIndex] === '1') {
+            isActive = true
+            const starts = String(cls.startTimes || '').split(',')
+            const ends = String(cls.endTimes || '').split(',')
+            startTimeStr = starts[dayIndex]
+            endTimeStr = ends[dayIndex]
+          }
+        }
+      }
+
       if (!isActive) return
-      const startTimeStr = cls.startTimes.split(',')[dayIndex]
-      const endTimeStr = cls.endTimes.split(',')[dayIndex]
       if (!startTimeStr || !endTimeStr) return
       const startHour = parseTime(startTimeStr)
       const duration = parseTime(endTimeStr) - startHour
 
       // Profesor y salón del día actual
-      const professors = cls.professor ? cls.professor.split(',') : []
-      const rooms = cls.room ? cls.room.split(',') : []
+      const professors = cls.professor ? String(cls.professor).split(',') : []
+      const rooms = cls.room ? String(cls.room).split(',') : []
       const professorToday = professors[dayIndex] || ''
       const roomToday = rooms[dayIndex] || ''
 
@@ -135,13 +193,49 @@ export function ScheduleGrid({ weekDates, userId, onUpdateClass, onDeleteClass, 
       })
     })
 
-    // Actividades
+    // Actividades (support same shapes)
     activities.forEach(act => {
-      if (!act.days) return
-      const isActive = act.days.split(',')[dayIndex] === '1'
+      const dayKey = DAYS_ORDER[dayIndex]
+
+      let isActive = false
+      let startTimeStr: string | undefined
+      let endTimeStr: string | undefined
+
+      if (act.dayTimes && typeof act.dayTimes === 'object') {
+        const times = act.dayTimes[dayKey]
+        if (times && times.start && times.end) {
+          isActive = true
+          startTimeStr = times.start
+          endTimeStr = times.end
+        }
+      }
+
+      if (!isActive && Array.isArray(act.days)) {
+        const normalized = act.days.map((d: any) => String(d).toLowerCase())
+        if (normalized.includes(dayKey)) {
+          isActive = true
+          if (act.dayTimes && act.dayTimes[dayKey]) {
+            startTimeStr = act.dayTimes[dayKey].start
+            endTimeStr = act.dayTimes[dayKey].end
+          }
+        }
+      }
+
+      if (!isActive && act.days && typeof act.days === 'string') {
+        const s = String(act.days).trim()
+        if (/^[01](?:,?[01])*$/.test(s)) {
+          const parts = s.includes(',') ? s.split(',') : s.split('')
+          if (parts[dayIndex] === '1') {
+            isActive = true
+            const starts = String(act.startTimes || '').split(',')
+            const ends = String(act.endTimes || '').split(',')
+            startTimeStr = starts[dayIndex]
+            endTimeStr = ends[dayIndex]
+          }
+        }
+      }
+
       if (!isActive) return
-      const startTimeStr = act.startTimes.split(',')[dayIndex]
-      const endTimeStr = act.endTimes.split(',')[dayIndex]
       if (!startTimeStr || !endTimeStr) return
       const startHour = parseTime(startTimeStr)
       const duration = parseTime(endTimeStr) - startHour

@@ -5,7 +5,8 @@ interface ClassBlockProps {
   startHour: number
   duration: number
   heightPerHour: number
-  onClick?: (e?: MouseEvent<HTMLDivElement> | KeyboardEvent<HTMLDivElement>) => void
+  // onClick receives the item (classData) when activated
+  onClick?: (item?: any) => void
 }
 
 export function ClassBlock({ classData, startHour, duration, heightPerHour, onClick }: ClassBlockProps) {
@@ -13,10 +14,10 @@ export function ClassBlock({ classData, startHour, duration, heightPerHour, onCl
 
   return (
     <div
-      onClick={(e) => { e.stopPropagation(); onClick?.(e as any) }}
+      onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClick?.(classData) }}
       role="button"
       tabIndex={0}
-      onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onClick?.(e as any) } }}
+      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); onClick?.(classData) } }}
       className="mx-2 mb-1 rounded-lg border cursor-pointer hover:opacity-90 transition-all shadow-sm hover:shadow-md"
       style={{
         height: `${height - 3}px`,
