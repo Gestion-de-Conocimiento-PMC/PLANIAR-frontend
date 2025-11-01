@@ -1,5 +1,6 @@
+import React from 'react'
 import { useState, useEffect } from 'react'
-import { Calendar, CheckSquare, BarChart3, Plus } from 'lucide-react'
+import { Calendar, CheckSquare, BarChart3, Plus, MoveRight } from 'lucide-react'
 import { Button } from './components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './components/ui/tabs'
 import { Badge } from './components/ui/badge'
@@ -15,6 +16,8 @@ import { AddEventModal } from './components/AddEventModal'
 import { APIPATH } from './lib/api'
 import { EditClassesDialog } from './components/EditClassesDialog'
 import { User, TaskActivity, ClassItem } from './types'
+import { motion, AnimatePresence } from "framer-motion";
+import { X } from "lucide-react"; // 👈 Importa el icono
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
@@ -23,11 +26,13 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard')
   const [isAddEventOpen, setIsAddEventOpen] = useState(false)
   const [isEditClassesOpen, setIsEditClassesOpen] = useState(false)
-  
+  const [showSurvey, setShowSurvey] = useState(true);
+
   // Dataset/Users - User database with activities and classes
   const [users, setUsers] = useState<User[]>([
     {
-      // User/JohnDoe - Test user with all activities
+      // User/JohnDoe - Test user with all activitiesnpx tailwindcss -v
+
       name: 'John Doe',
       email: 'john.doe@mail.com',
       password: '1234',
@@ -595,13 +600,72 @@ export default function App() {
   const userClasses = getUserClasses()
 
   return (
+
+
+
     <div className="min-h-screen bg-background">
+
+      <AnimatePresence>
+        {showSurvey && (
+          <motion.div
+            key="survey"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.4, ease: "easeInOut" }}
+            className="overflow-hidden bg-purple-100 border-b border-purple-300"
+          >
+
+            <div className=" mx-auto px-4" style={{
+              overflow: "hidden",
+              // borderBottom: "1px solid #c4b5fd",
+              background: "linear-gradient(to right, #866EFF 0%, white 15%, white 85%, #866EFF 100%)",
+            }}>
+              <div className="max-w-7xl mx-auto px-4" style={{height: '85px'}}>
+                <div className="flex items-center justify-between h-full">
+                  {/* <div className="flex items-center gap-4" style={{ marginLeft: '24px' }}> */}
+                    <Button
+                      onClick={() => setShowSurvey(false)}
+                      className="absolute top-2 left-2 text-gray-500 hover:text-gray-700 transition-colors rounded-md p-1"
+                      title="Cerrar encuesta"
+                      style={{
+                        background: "transparent",
+                        // border: "none",
+                        boxShadow: "none",
+                        minHeight: "auto",
+                        height: "auto",
+                      }}
+                    >
+                      <X size={20} strokeWidth={2} />
+                    </Button>
+                    <h2 className="text-lg font-bold text-purple">
+                      Encuesta rápida
+                    </h2>
+                    <h5 className="text-lg text-purple-800">
+                      ¿Hoy sentí que la aplicación me ayudó a organizar mis tareas de forma personalizada, redujo mi estrés académico, fue fácil de usar y contribuyó positivamente a mejorar mi desempeño?
+                    </h5>
+                    <Button
+                      onClick={() => setIsAddEventOpen(true)}
+                      className="gap-2 bg-[#7B61FF] hover:bg-[#6B51EF] text-white shadow-lg rounded-lg px-4"
+                      // style={{ minHeight: '48px', height: '48px' }}
+                      title="Add Task"
+                    >
+                      <MoveRight className="w-5 h-5" />
+                      <span>Enviar</span>
+                    </Button>
+                  {/* </div> */}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       {/* Header - Component/Header with official logo */}
       <header className="border-b sticky top-0 z-50 bg-white dark:bg-[#1a1a1a]" style={{ 
         height: '72px',
         boxShadow: '0 2px 6px rgba(0,0,0,0.05)'
       }}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full">
+        <div className="max-w-7xl mx-auto px-1 sm:px-6 lg:px-8 h-full">
           <div className="flex items-center justify-between h-full">
             <div className="flex items-center gap-4" style={{ marginLeft: '24px' }}>
               <button

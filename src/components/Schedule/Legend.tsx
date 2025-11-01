@@ -1,3 +1,5 @@
+import React from 'react'
+
 export function ScheduleLegend() {
   return (
     <div className="flex flex-wrap items-center gap-6 text-sm">

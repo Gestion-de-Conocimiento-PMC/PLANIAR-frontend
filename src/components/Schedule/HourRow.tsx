@@ -1,3 +1,5 @@
+import React from 'react'
+
 interface HourRowProps {
   hour: number
   heightPerHour: number

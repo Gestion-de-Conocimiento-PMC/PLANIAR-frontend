@@ -4,6 +4,7 @@ import { ClassBlock } from './ClassBlock'
 import { TaskBlock } from './TaskBlock'
 import { ClassDetailDialog } from '../ClassDetailDialog'
 import { APIPATH } from '../../lib/api'
+import React from 'react'
 
 interface ScheduleGridProps {
   weekDates: Date[]
