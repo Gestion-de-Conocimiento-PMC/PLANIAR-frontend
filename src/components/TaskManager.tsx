@@ -17,6 +17,10 @@ export interface TaskForUI {
   classId?: number
   subject: string
   dueDate: string
+  // optional scheduling fields from backend
+  workingDate?: string | null
+  startTime?: string | null
+  endTime?: string | null
   priority: 'High' | 'Medium' | 'Low'
   estimatedTime: number
   description: string
@@ -46,7 +50,11 @@ export function TaskManager({ userId, onUpdateTask, onDeleteTask, dataRefreshKey
     title: task.title,
     classId: task.classId,
     subject: '', // se rellenará luego con la info de la clase
-    dueDate: task.date,
+    dueDate: (task as any).dueDate || (task as any).date || '',
+    // keep scheduling fields if present so edit dialog can show them
+    workingDate: (task as any).workingDate ?? (task as any).working_date ?? null,
+    startTime: (task as any).startTime ?? (task as any).start_time ?? null,
+    endTime: (task as any).endTime ?? (task as any).end_time ?? null,
     priority: (task.priority || 'Low') as 'High' | 'Medium' | 'Low',
     estimatedTime: task.estimatedTime || 0,
     description: task.description || '',
@@ -157,9 +165,18 @@ export function TaskManager({ userId, onUpdateTask, onDeleteTask, dataRefreshKey
     setSortBy('dueDate')
   }
 
+  const parseDateVal = (v?: any) => {
+    if (!v) return null
+    if (typeof v === 'string') return v.split('T')[0]
+    if (typeof v === 'object' && v.year && v.month && v.day) return `${v.year}-${String(v.month).padStart(2,'0')}-${String(v.day).padStart(2,'0')}`
+    return String(v).split('T')[0]
+  }
+
   const isOverdue = (task: TaskForUI) => {
     const today = new Date().toISOString().split('T')[0]
-    return task.status !== 'Completed' && task.dueDate < today
+    const due = parseDateVal(task.dueDate)
+    if (!due) return false
+    return task.status !== 'Completed' && due < today
   }
 
   const getPriorityColor = (priority: string) => {
@@ -179,8 +196,10 @@ export function TaskManager({ userId, onUpdateTask, onDeleteTask, dataRefreshKey
     }
   }
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
+  const formatDate = (dateString: string | any) => {
+    const ds = parseDateVal(dateString)
+    if (!ds) return ''
+    const date = new Date(ds)
     const today = new Date()
     const tomorrow = new Date(today)
     tomorrow.setDate(today.getDate() + 1)

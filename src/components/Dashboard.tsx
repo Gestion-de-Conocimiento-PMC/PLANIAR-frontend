@@ -72,24 +72,43 @@ export function Dashboard({ userId, userName, onAddTask, initialTasks, dataRefre
       return d
     })
 
-    const allTasks: TaskActivity[] = []
-
-    for (const date of weekDates) {
-      try {
-        const dateStr = date.toISOString().split('T')[0]
-  const res = await fetch(APIPATH(`/tasks/user/${userId}/date/${dateStr}`))
-        if (res.ok) {
-          const dayTasks = await res.json()
-          allTasks.push(...dayTasks)
+    // Fetch all user tasks once and filter client-side by week range. Some backends
+    // don't implement per-day endpoints (avoid 404). This also reduces many requests.
+    let normalized: TaskActivity[] = []
+    try {
+      const res = await fetch(APIPATH(`/tasks/user/${userId}`))
+      if (res.ok) {
+        const allData = await res.json()
+        // helper to normalize date-like values (string ISO or {year,month,day})
+        const parseDateVal = (v: any) => {
+          if (!v) return null
+          if (typeof v === 'string') return v.split('T')[0]
+          if (typeof v === 'object' && v.year && v.month && v.day) return `${v.year}-${String(v.month).padStart(2,'0')}-${String(v.day).padStart(2,'0')}`
+          return String(v).split('T')[0]
         }
-      } catch (err) {
-        console.error('Error fetching tasks:', err)
-      }
-    }
 
-    // Normalize fields coming from the API (ensure consistent shape and casing)
-    const normalized = allTasks.map(t => normalize(t))
-    setTasks(normalized)
+        const weekDateStrs = weekDates.map(d => d.toISOString().split('T')[0])
+        const filtered = (allData || []).filter((t: any) => {
+          const raw = (t as any).workingDate ?? (t as any).date ?? (t as any).dueDate
+          const parsed = parseDateVal(raw)
+          return parsed && weekDateStrs.includes(parsed)
+        })
+
+        const normalized = filtered.map((t: any) => normalize(t))
+        setTasks(normalized)
+
+        // lifetime tasks (all data)
+        const normalizedAll = (allData || []).map((t: any) => normalize(t))
+        setLifetimeTasks(normalizedAll)
+      } else {
+        setTasks([])
+        setLifetimeTasks([])
+      }
+    } catch (err) {
+      console.error('Error fetching tasks:', err)
+      setTasks([])
+      setLifetimeTasks([])
+    }
     // Try to fetch lifetime / all tasks for better lifetime metrics. If the
     // endpoint doesn't exist or fails, fall back to the week-limited list.
     try {

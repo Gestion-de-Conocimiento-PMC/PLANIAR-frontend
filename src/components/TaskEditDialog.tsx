@@ -38,18 +38,55 @@ export function TaskEditDialog({ task, onUpdateTask, children, onRefresh }: Task
     description: '',
     state: 'Pending'
   })
+  // advanced scheduling fields (hidden by default)
+  const [showAdvanced, setShowAdvanced] = useState(false)
+  const [workingDate, setWorkingDate] = useState('')
+  const [startTime, setStartTime] = useState('')
+  const [endTime, setEndTime] = useState('')
 
   useEffect(() => {
     if (task) {
       setFormData({
         title: task.title || '',
         subject: task.subject || '',
-        date: task.dueDate || '',
+        date: (task as any).dueDate || (task as any).date || '',
         priority: task.priority || 'Medium',
         estimatedTime: task.estimatedTime || 60,
         description: task.description || '',
         state: task.status || 'Pending'
       })
+      // populate advanced fields from task if available
+      // helper to normalize LocalDate/LocalTime representations
+      const parseDateVal = (v: any) => {
+        if (!v) return ''
+        if (typeof v === 'string') return v.split('T')[0]
+        if (typeof v === 'object' && v.year && v.month && v.day) {
+          const mm = String(v.month).padStart(2, '0')
+          const dd = String(v.day).padStart(2, '0')
+          return `${v.year}-${mm}-${dd}`
+        }
+        return String(v)
+      }
+
+      const parseTimeVal = (v: any) => {
+        if (!v) return ''
+        if (typeof v === 'string') {
+          const parts = v.split(':')
+          return parts.length >= 2 ? `${parts[0].padStart(2,'0')}:${parts[1].padStart(2,'0')}` : v
+        }
+        if (typeof v === 'object' && (v.hour !== undefined)) {
+          const hh = String(v.hour).padStart(2,'0')
+          const mm = String(v.minute ?? v.min ?? 0).padStart(2,'0')
+          return `${hh}:${mm}`
+        }
+        return String(v)
+      }
+
+      setWorkingDate(parseDateVal((task as any).workingDate ?? (task as any).working_date))
+      setStartTime(parseTimeVal((task as any).startTime ?? (task as any).start_time))
+      setEndTime(parseTimeVal((task as any).endTime ?? (task as any).end_time))
+      // hide advanced by default when opening edit dialog
+      setShowAdvanced(false)
     }
   }, [task])
 
@@ -62,15 +99,22 @@ export function TaskEditDialog({ task, onUpdateTask, children, onRefresh }: Task
     if (!formData.title.trim() || !formData.subject.trim() || !formData.date) return
 
     try {
-      const payload = {
+      // Build payload including scheduling fields. If advanced editing is off,
+      // include the existing scheduling values so they are preserved on update.
+      const payload: any = {
         title: formData.title,
         classId: task.classId,
         type: "Homework",
-        date: formData.date,
+        // send backend field dueDate
+        dueDate: formData.date,
         priority: formData.priority,
         estimatedTime: formData.estimatedTime,
         description: formData.description,
-        state: formData.state
+        state: formData.state,
+        // preserve or update scheduling fields
+        workingDate: showAdvanced ? (workingDate || null) : ((task as any).workingDate ?? (task as any).working_date ?? null),
+        startTime: showAdvanced ? (startTime || null) : ((task as any).startTime ?? (task as any).start_time ?? null),
+        endTime: showAdvanced ? (endTime || null) : ((task as any).endTime ?? (task as any).end_time ?? null)
       }
 
   const response = await fetch(APIPATH(`/tasks/${task.id}`), {
@@ -201,6 +245,43 @@ export function TaskEditDialog({ task, onUpdateTask, children, onRefresh }: Task
               </div>
             </CardContent>
           </Card>
+
+          {/* Advanced scheduling fields */}
+          {showAdvanced ? (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label>Work Day</Label>
+                    <Input type="date" value={workingDate} onChange={e => setWorkingDate(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Start Time</Label>
+                    <Input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>End Time</Label>
+                    <Input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="pt-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-xs text-muted-foreground">Work session</div>
+                    <div className="text-sm">{workingDate ? new Date(workingDate).toLocaleDateString() : 'Not set'}</div>
+                    <div className="text-sm">{(startTime || endTime) ? `${startTime || 'TBD'} - ${endTime || 'TBD'}` : 'Not set'}</div>
+                  </div>
+                  <div>
+                    <Button variant="outline" size="sm" onClick={() => setShowAdvanced(true)}>Advanced</Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="description">Description</Label>
