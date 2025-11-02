@@ -377,7 +377,7 @@ export function WeeklyView({ userId }: WeeklyViewProps) {
                           {formatDate(date)}
                         </p>
                       </div>
-                      {isTodayDate && <Badge className="bg-[#7B61FF] text-white">Hoy</Badge>}
+                      {isTodayDate && <Badge className="bg-[#7B61FF] text-white">Today</Badge>}
                     </div>
 
                     <ScrollArea className="h-[400px] pr-2">

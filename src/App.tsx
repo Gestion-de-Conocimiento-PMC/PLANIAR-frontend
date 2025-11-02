@@ -132,7 +132,7 @@ export default function App() {
       }
       await loadUserData(user)
       setDataRefreshKey(k => k + 1)
-      setSuccessMessage('Clase creada correctamente')
+  setSuccessMessage('Class created successfully')
       setShowSuccessDialog(true)
     } catch (e) {
       console.error('Error creating class:', e)
@@ -154,7 +154,7 @@ export default function App() {
       if (!res.ok) throw new Error('Failed to update class')
       await loadUserData(user)
       setDataRefreshKey(k => k + 1)
-      setSuccessMessage('Clase actualizada correctamente')
+  setSuccessMessage('Class updated successfully')
       setShowSuccessDialog(true)
     } catch (e) {
       console.error(e)
@@ -176,7 +176,7 @@ export default function App() {
       }
       await loadUserData(user)
       setDataRefreshKey(k => k + 1)
-      setSuccessMessage('Clase eliminada correctamente')
+  setSuccessMessage('Class deleted successfully')
       setShowSuccessDialog(true)
     } catch (e) {
       console.error(e)
