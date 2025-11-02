@@ -68,11 +68,11 @@ export function UserAvatar({ user, onLogout, onEditClasses }: UserAvatarProps) {
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => setShowProfile(true)}>
             <User className="mr-2 h-4 w-4" />
-            <span>Mi perfil</span>
+            {"Profile"}
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => setShowOptions(true)}>
             <Settings className="mr-2 h-4 w-4" />
-            <span>Opciones</span>
+            <span>Options</span>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={onLogout} className="text-red-600">
@@ -82,7 +82,7 @@ export function UserAvatar({ user, onLogout, onEditClasses }: UserAvatarProps) {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Mi Perfil Dialog */}
+      {/* Profile Dialog */}
       <Dialog open={showProfile} onOpenChange={setShowProfile}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -93,7 +93,7 @@ export function UserAvatar({ user, onLogout, onEditClasses }: UserAvatarProps) {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <label className="text-sm">Name</label>
+              <label className="text-sm">Username</label>
               <p className="text-base">{displayName}</p>
             </div>
             <div className="space-y-2">
@@ -116,7 +116,7 @@ export function UserAvatar({ user, onLogout, onEditClasses }: UserAvatarProps) {
       <Dialog open={showOptions} onOpenChange={setShowOptions}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Opciones</DialogTitle>
+            <DialogTitle>Options</DialogTitle>
             <DialogDescription>
               Application configuration
             </DialogDescription>
@@ -124,11 +124,11 @@ export function UserAvatar({ user, onLogout, onEditClasses }: UserAvatarProps) {
           <div className="space-y-4 py-4">
             <div className="flex items-center justify-between">
               <label className="text-sm">Notifications</label>
-              <div className="text-muted-foreground text-sm">Coming soon</div>
+              <div className="text-muted-foreground text-sm">Coming soon...</div>
             </div>
             <div className="flex items-center justify-between">
               <label className="text-sm">Theme</label>
-              <div className="text-muted-foreground text-sm">Coming soon</div>
+              <div className="text-muted-foreground text-sm">Coming soon...</div>
             </div>
             <div className="flex items-center justify-between">
               <label className="text-sm">Language</label>
@@ -136,7 +136,7 @@ export function UserAvatar({ user, onLogout, onEditClasses }: UserAvatarProps) {
             </div>
             <div className="flex items-center justify-between">
               <label className="text-sm">Time zone</label>
-              <div className="text-muted-foreground text-sm">GMT-6</div>
+              <div className="text-muted-foreground text-sm">GMT-5</div>
             </div>
           </div>
         </DialogContent>
