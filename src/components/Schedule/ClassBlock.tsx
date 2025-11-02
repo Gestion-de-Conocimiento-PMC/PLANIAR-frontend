@@ -31,7 +31,7 @@ export function ClassBlock({ classData, startHour, duration, heightPerHour, onCl
         <p
           className="font-semibold text-sm leading-tight mb-1"
           style={{
-            color: classData?.color || '#7B61FF',
+            color: '#000000',
             wordBreak: 'break-word',
             overflowWrap: 'break-word'
           }}

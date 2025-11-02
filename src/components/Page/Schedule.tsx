@@ -9,18 +9,23 @@ interface ScheduleProps {
   userId: number | undefined
   onUpdateClass?: (id: string, updates: any) => void
   onDeleteClass?: (id: string) => void
-  onEditClasses?: () => void
+  onDeleteActivity?: (id: string | number) => void
+  // Now accepts optional lists so the Schedule can pass the current classes/activities
+  onEditClasses?: (classes?: any[], activities?: any[], itemToEdit?: any) => void
   existingClasses?: any[]
   existingActivities?: any[]
+  dataRefreshKey?: number
 }
 
 export function Schedule({ 
   userId, 
   onUpdateClass, 
   onDeleteClass,
+  onDeleteActivity,
   onEditClasses,
   existingClasses,
-  existingActivities
+  existingActivities,
+  dataRefreshKey
 }: ScheduleProps) {
   // State for current week's Monday
   const [currentWeekStart, setCurrentWeekStart] = useState(() => {
@@ -94,12 +99,12 @@ export function Schedule({
 
           {/* Manage Classes - opens EditClassesDialog via prop */}
           <Button
-            onClick={() => onEditClasses && onEditClasses()}
+            onClick={() => onEditClasses?.(existingClasses ?? [], existingActivities ?? [])}
             className="gap-2 bg-[#7B61FF] hover:bg-[#6D28D9] text-white border-0"
-            title="Manage Classes"
+            title="Manage Classes & Activities"
           >
             <Edit className="w-4 h-4 text-white" />
-            <span className="hidden sm:inline">Manage Classes</span>
+            <span className="hidden sm:inline">Manage Classes & Activities</span>
           </Button>
         </div>
       </div>
@@ -110,9 +115,11 @@ export function Schedule({
         userId={userId ?? null}
         onUpdateClass={onUpdateClass}
         onDeleteClass={onDeleteClass}
+        onDeleteActivity={onDeleteActivity}
         onEditClasses={onEditClasses}
         existingClasses={existingClasses}
         existingActivities={existingActivities}
+        dataRefreshKey={dataRefreshKey}
       />
 
       {/* Legend */}

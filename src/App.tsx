@@ -10,8 +10,8 @@ import { TaskManager } from './components/TaskManager'
 import { Login } from './components/Login'
 import { Register } from './components/Register'
 import { UserAvatar } from './components/UserAvatar'
-import { ImageWithFallback } from './components/figma/ImageWithFallback'
 import { AddEventModal } from './components/AddEventModal'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './components/ui/dialog'
 import { APIPATH } from './lib/api'
 import { EditClassesDialog } from './components/EditClassesDialog'
 import { User, TaskActivity, ClassItem } from './types'
@@ -23,497 +23,344 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard')
   const [isAddEventOpen, setIsAddEventOpen] = useState(false)
   const [isEditClassesOpen, setIsEditClassesOpen] = useState(false)
+  const [selectedClassesForDialog, setSelectedClassesForDialog] = useState<any[] | null>(null)
+  const [selectedActivitiesForDialog, setSelectedActivitiesForDialog] = useState<any[] | null>(null)
+  const [selectedItemForDialog, setSelectedItemForDialog] = useState<any | null>(null)
   
-  // Dataset/Users - User database with activities and classes
-  const [users, setUsers] = useState<User[]>([
-    {
-      // User/JohnDoe - Test user with all activities
-      name: 'John Doe',
-      email: 'john.doe@mail.com',
-      password: '1234',
-      classes: [
-        {
-          id: 'class-1',
-          title: 'Mathematics 101',
-          days: ['monday', 'wednesday', 'friday'],
-          dateFrom: '2025-10-01',
-          dateTo: '2025-12-20',
-          dayTimes: {
-            monday: { start: '09:00', end: '10:30' },
-            wednesday: { start: '09:00', end: '10:30' },
-            friday: { start: '09:00', end: '10:30' }
-          },
-          room: 'Room 305',
-          professor: 'Dr. Smith',
-          color: '#3B82F6'
-        },
-        {
-          id: 'class-2',
-          title: 'Chemistry Lab',
-          days: ['tuesday', 'thursday'],
-          dateFrom: '2025-10-01',
-          dateTo: '2025-12-20',
-          dayTimes: {
-            tuesday: { start: '14:00', end: '16:00' },
-            thursday: { start: '14:00', end: '16:00' }
-          },
-          room: 'Lab 201',
-          professor: 'Dr. Johnson',
-          color: '#10B981'
+  // Data loaded from backend for the current logged user
+  const [userClasses, setUserClasses] = useState<any[]>([])
+  const [userActivities, setUserActivities] = useState<any[]>([])
+  const [loadingUserData, setLoadingUserData] = useState(false)
+  // Used to notify child views to refresh data after create/update/delete
+  const [dataRefreshKey, setDataRefreshKey] = useState(0)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+
+  // Global notification event listener so child components can trigger app-styled dialogs
+  useEffect(() => {
+    const handler = (e: any) => {
+      const msg = e?.detail?.message
+      if (msg) {
+        setSuccessMessage(String(msg))
+        setShowSuccessDialog(true)
+      }
+    }
+    window.addEventListener('planiar:notify', handler as EventListener)
+    return () => window.removeEventListener('planiar:notify', handler as EventListener)
+  }, [])
+
+  // Load user's classes and activities from backend
+  const loadUserData = async (u: any | null) => {
+    if (!u) {
+      setUserClasses([])
+      setUserActivities([])
+      return
+    }
+
+    setLoadingUserData(true)
+    try {
+      const idPart = u.id ? u.id : undefined
+      const emailPart = u.email ? encodeURIComponent(u.email) : undefined
+
+      // Try endpoints by user id first, then fallback to email-based endpoints
+      const classesPaths = idPart ? [APIPATH(`/classes/user/${idPart}`)] : []
+      const activitiesPaths = idPart ? [APIPATH(`/activities/user/${idPart}`)] : []
+      if (!idPart && emailPart) {
+        classesPaths.push(APIPATH(`/classes/user/email/${emailPart}`))
+        activitiesPaths.push(APIPATH(`/activities/user/email/${emailPart}`))
+      }
+
+      // Fetch classes
+      let classes: any[] = []
+      for (const p of classesPaths) {
+        try {
+          const res = await fetch(p)
+          if (res.ok) {
+            classes = await res.json()
+            break
+          }
+        } catch (e) {
+          console.warn('Failed to fetch classes from', p, e)
         }
-      ],
-      activities: [
-        // Monday 10/7 (Today)
-        {
-          id: 1,
-          title: 'Morning Workout',
-          type: 'activity',
-          subject: 'Fitness',
-          dueDate: '2025-10-07',
-          priority: 'medium',
-          estimatedTime: 60,
-          status: 'in-progress',
-          description: 'Cardio and strength training session',
-          suggestedStartTime: '07:00'
-        },
-        {
-          id: 2,
-          title: 'Math Homework - Chapter 5',
-          type: 'homework',
-          subject: 'Mathematics',
-          dueDate: '2025-10-07',
-          priority: 'high',
-          estimatedTime: 90,
-          status: 'pending',
-          description: 'Complete exercises 1-15 on quadratic equations',
-          suggestedStartTime: '14:00'
-        },
-        {
-          id: 3,
-          title: 'Team Meeting',
-          type: 'activity',
-          subject: 'Work',
-          dueDate: '2025-10-07',
-          priority: 'high',
-          estimatedTime: 120,
-          status: 'pending',
-          description: 'Weekly project status meeting',
-          suggestedStartTime: '10:00'
-        },
-        // Tuesday 10/8
-        {
-          id: 4,
-          title: 'Chemistry Lab Report',
-          type: 'homework',
-          subject: 'Chemistry',
-          dueDate: '2025-10-08',
-          priority: 'high',
-          estimatedTime: 150,
-          status: 'pending',
-          description: 'Complete lab report on chemical reactions',
-          suggestedStartTime: '09:00'
-        },
-        {
-          id: 5,
-          title: 'Piano Practice',
-          type: 'activity',
-          subject: 'Music',
-          dueDate: '2025-10-08',
-          priority: 'low',
-          estimatedTime: 45,
-          status: 'pending',
-          description: 'Practice scales and Bach invention',
-          suggestedStartTime: '18:00'
-        },
-        {
-          id: 6,
-          title: 'Reading Assignment',
-          type: 'homework',
-          subject: 'Literature',
-          dueDate: '2025-10-08',
-          priority: 'medium',
-          estimatedTime: 75,
-          status: 'pending',
-          description: 'Read chapters 3-5 of assigned novel',
-          suggestedStartTime: '15:30'
-        },
-        // Wednesday 10/9
-        {
-          id: 7,
-          title: 'Physics Problem Set',
-          type: 'homework',
-          subject: 'Physics',
-          dueDate: '2025-10-09',
-          priority: 'high',
-          estimatedTime: 120,
-          status: 'pending',
-          description: 'Solve problems 1-20 on momentum and energy',
-          suggestedStartTime: '13:00'
-        },
-        {
-          id: 8,
-          title: 'Yoga Class',
-          type: 'activity',
-          subject: 'Fitness',
-          dueDate: '2025-10-09',
-          priority: 'medium',
-          estimatedTime: 90,
-          status: 'pending',
-          description: 'Evening yoga and meditation session',
-          suggestedStartTime: '19:00'
-        },
-        {
-          id: 9,
-          title: 'Spanish Vocabulary',
-          type: 'homework',
-          subject: 'Spanish',
-          dueDate: '2025-10-09',
-          priority: 'low',
-          estimatedTime: 30,
-          status: 'pending',
-          description: 'Study vocabulary list for upcoming quiz',
-          suggestedStartTime: '16:00'
-        },
-        // Thursday 10/10
-        {
-          id: 10,
-          title: 'History Essay',
-          type: 'homework',
-          subject: 'History',
-          dueDate: '2025-10-10',
-          priority: 'high',
-          estimatedTime: 180,
-          status: 'pending',
-          description: 'Write 1000-word essay on World War II causes',
-          suggestedStartTime: '09:30'
-        },
-        {
-          id: 11,
-          title: 'Grocery Shopping',
-          type: 'activity',
-          subject: 'Personal',
-          dueDate: '2025-10-10',
-          priority: 'medium',
-          estimatedTime: 60,
-          status: 'pending',
-          description: 'Weekly grocery shopping trip',
-          suggestedStartTime: '17:00'
-        },
-        {
-          id: 12,
-          title: 'Art Project',
-          type: 'homework',
-          subject: 'Art',
-          dueDate: '2025-10-10',
-          priority: 'medium',
-          estimatedTime: 90,
-          status: 'pending',
-          description: 'Complete watercolor landscape painting',
-          suggestedStartTime: '14:00'
-        },
-        // Friday 10/11
-        {
-          id: 13,
-          title: 'Biology Quiz Prep',
-          type: 'homework',
-          subject: 'Biology',
-          dueDate: '2025-10-11',
-          priority: 'high',
-          estimatedTime: 105,
-          status: 'pending',
-          description: 'Review cell structure and photosynthesis',
-          suggestedStartTime: '14:30'
-        },
-        {
-          id: 14,
-          title: 'Movie Night',
-          type: 'activity',
-          subject: 'Entertainment',
-          dueDate: '2025-10-11',
-          priority: 'low',
-          estimatedTime: 120,
-          status: 'pending',
-          description: 'Watch movie with friends',
-          suggestedStartTime: '20:00'
-        },
-        {
-          id: 15,
-          title: 'Code Review',
-          type: 'activity',
-          subject: 'Work',
-          dueDate: '2025-10-11',
-          priority: 'medium',
-          estimatedTime: 90,
-          status: 'pending',
-          description: 'Review teammate\'s code submissions',
-          suggestedStartTime: '11:00'
-        },
-        // Saturday 10/12
-        {
-          id: 16,
-          title: 'House Cleaning',
-          type: 'activity',
-          subject: 'Personal',
-          dueDate: '2025-10-12',
-          priority: 'medium',
-          estimatedTime: 120,
-          status: 'pending',
-          description: 'Deep clean kitchen and bathroom',
-          suggestedStartTime: '09:00'
-        },
-        {
-          id: 17,
-          title: 'Guitar Practice',
-          type: 'activity',
-          subject: 'Music',
-          dueDate: '2025-10-12',
-          priority: 'low',
-          estimatedTime: 60,
-          status: 'pending',
-          description: 'Practice new songs for upcoming performance',
-          suggestedStartTime: '15:00'
-        },
-        {
-          id: 18,
-          title: 'Statistics Assignment',
-          type: 'homework',
-          subject: 'Mathematics',
-          dueDate: '2025-10-12',
-          priority: 'medium',
-          estimatedTime: 135,
-          status: 'pending',
-          description: 'Complete statistical analysis problems',
-          suggestedStartTime: '13:00'
-        },
-        // Sunday 10/13
-        {
-          id: 19,
-          title: 'Family Dinner',
-          type: 'activity',
-          subject: 'Personal',
-          dueDate: '2025-10-13',
-          priority: 'high',
-          estimatedTime: 180,
-          status: 'pending',
-          description: 'Sunday family dinner at home',
-          suggestedStartTime: '18:00'
-        },
-        {
-          id: 20,
-          title: 'Week Planning',
-          type: 'activity',
-          subject: 'Planning',
-          dueDate: '2025-10-13',
-          priority: 'medium',
-          estimatedTime: 45,
-          status: 'pending',
-          description: 'Plan and organize upcoming week',
-          suggestedStartTime: '10:00'
-        },
-        {
-          id: 21,
-          title: 'Nature Walk',
-          type: 'activity',
-          subject: 'Fitness',
-          dueDate: '2025-10-13',
-          priority: 'low',
-          estimatedTime: 90,
-          status: 'pending',
-          description: 'Relaxing walk in the local park',
-          suggestedStartTime: '14:00'
+      }
+
+      // Fetch activities
+      let activities: any[] = []
+      for (const p of activitiesPaths) {
+        try {
+          const res = await fetch(p)
+          if (res.ok) {
+            activities = await res.json()
+            break
+          }
+        } catch (e) {
+          console.warn('Failed to fetch activities from', p, e)
         }
+      }
+
+      setUserClasses(classes || [])
+      setUserActivities(activities || [])
+    } finally {
+      setLoadingUserData(false)
+    }
+  }
+
+  // Class Management (backend-aware)
+  const createClass = async (classData: any) => {
+    if (!user) return
+    try {
+      // Backend expects POST /api/classes/user/{userId}
+      const url = APIPATH(`/classes/user/${user.id}`)
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        // send the class entity in the body; user is provided in the path per backend controller
+        body: JSON.stringify(classData)
+      })
+      if (!res.ok) {
+        // Try to parse server error payload for a helpful message
+        let serverMsg = 'Failed to create class'
+        try {
+          const errBody = await res.json()
+          serverMsg = errBody?.error || errBody?.message || JSON.stringify(errBody)
+        } catch (e) {
+          try { serverMsg = await res.text() } catch (e) { /* ignore */ }
+        }
+        // notify user via app notification
+        window.dispatchEvent(new CustomEvent('planiar:notify', { detail: { message: serverMsg } }))
+        throw new Error(serverMsg)
+      }
+      await loadUserData(user)
+      setDataRefreshKey(k => k + 1)
+      setSuccessMessage('Clase creada correctamente')
+      setShowSuccessDialog(true)
+    } catch (e) {
+      console.error('Error creating class:', e)
+      // Ensure the user is notified if not already notified above
+      if (e instanceof Error) {
+        window.dispatchEvent(new CustomEvent('planiar:notify', { detail: { message: e.message } }))
+      }
+    }
+  }
+
+  const updateClass = async (classId: string, updates: any) => {
+    if (!user) return
+    try {
+      const res = await fetch(APIPATH(`/classes/${classId}`), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      })
+      if (!res.ok) throw new Error('Failed to update class')
+      await loadUserData(user)
+      setDataRefreshKey(k => k + 1)
+      setSuccessMessage('Clase actualizada correctamente')
+      setShowSuccessDialog(true)
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  const deleteClass = async (classId: string) => {
+    if (!user) return
+    try {
+      const res = await fetch(APIPATH(`/classes/${classId}`), { method: 'DELETE' })
+      if (!res.ok) {
+        let serverMsg = 'Failed to delete class'
+        try {
+          const err = await res.json()
+          serverMsg = err?.error || err?.message || JSON.stringify(err)
+        } catch {}
+        window.dispatchEvent(new CustomEvent('planiar:notify', { detail: { message: serverMsg } }))
+        throw new Error(serverMsg)
+      }
+      await loadUserData(user)
+      setDataRefreshKey(k => k + 1)
+      setSuccessMessage('Clase eliminada correctamente')
+      setShowSuccessDialog(true)
+    } catch (e) {
+      console.error(e)
+      if (e instanceof Error) window.dispatchEvent(new CustomEvent('planiar:notify', { detail: { message: e.message } }))
+    }
+  }
+
+  // Activity Management (backend-aware)
+  const createActivity = async (activityData: any) => {
+    if (!user) return
+    try {
+      // Backend expects POST /api/activities/user/{userId}
+      const res = await fetch(APIPATH(`/activities/user/${user.id}`), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(activityData)
+      })
+      if (!res.ok) throw new Error('Failed to create activity')
+      await loadUserData(user)
+      setDataRefreshKey(k => k + 1)
+      setSuccessMessage('Activity created successfully')
+      setShowSuccessDialog(true)
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  const updateActivity = async (activityId: string | number, updates: any) => {
+    if (!user) return
+    try {
+      const res = await fetch(APIPATH(`/activities/${activityId}`), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      })
+      if (!res.ok) throw new Error('Failed to update activity')
+      await loadUserData(user)
+      setDataRefreshKey(k => k + 1)
+      setSuccessMessage('Activity updated successfully')
+      setShowSuccessDialog(true)
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  const deleteActivity = async (activityId: string | number) => {
+    if (!user) return
+    try {
+      // Some backends require a user-scoped delete endpoint for activities.
+      // Try the user-scoped route first, then fall back to the generic activity id route.
+      const candidateUrls = [
+        APIPATH(`/activities/user/${user.id}/${activityId}`),
+        APIPATH(`/activities/${activityId}`)
       ]
-    },
-    {
-      // Additional test user with no activities
-      name: 'Ana',
-      email: 'ana@mail.com',
-      password: 'abcd',
-      classes: [],
-      activities: []
+      let res: Response | null = null
+      let lastError: any = null
+      for (const url of candidateUrls) {
+        try {
+          res = await fetch(url, { method: 'DELETE' })
+          if (res.ok) break
+          // if not ok, capture body for message and continue to next candidate
+          lastError = res
+        } catch (e) {
+          lastError = e
+        }
+      }
+      if (!res || !res.ok) {
+        let serverMsg = 'Failed to delete activity'
+        try {
+          if (lastError && typeof lastError.json === 'function') {
+            const err = await lastError.json()
+            serverMsg = err?.error || err?.message || JSON.stringify(err)
+          } else if (lastError && typeof lastError.text === 'function') {
+            serverMsg = await lastError.text()
+          } else if (lastError instanceof Error) {
+            serverMsg = lastError.message
+          }
+        } catch {}
+        window.dispatchEvent(new CustomEvent('planiar:notify', { detail: { message: serverMsg } }))
+        throw new Error(serverMsg)
+      }
+      await loadUserData(user)
+      setDataRefreshKey(k => k + 1)
+      setSuccessMessage('Activity deleted successfully')
+      setShowSuccessDialog(true)
+    } catch (e) {
+      console.error(e)
+      if (e instanceof Error) window.dispatchEvent(new CustomEvent('planiar:notify', { detail: { message: e.message } }))
     }
-  ])
-
-  // Get current user's data
-  const getCurrentUser = () => {
-    if (!user) return null
-    return users.find(u => u.email === user.email)
   }
 
-  const getUserTasks = () => {
-    const currentUser = getCurrentUser()
-    return currentUser?.activities || []
-  }
-
-  const getUserClasses = () => {
-    const currentUser = getCurrentUser()
-    return currentUser?.classes || []
-  }
-
-  // Class Management
-  const createClass = (classData: any) => {
+  // Task Management (backend-aware). Tasks are handled via /tasks endpoints when available.
+  const addTask = async (newTask: any) => {
     if (!user) return
-
-    const newClass = {
-      ...classData,
-      id: `class-${Date.now()}`,
-      type: 'class'
+    try {
+      // Backend expects a user-scoped create for tasks: POST /api/tasks/user/{userId}
+      const res = await fetch(APIPATH(`/tasks/user/${user.id}`), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newTask)
+      })
+      if (!res.ok) {
+        let serverMsg = 'Failed to add task'
+        try {
+          const err = await res.json()
+          serverMsg = err?.error || err?.message || JSON.stringify(err)
+        } catch {}
+        window.dispatchEvent(new CustomEvent('planiar:notify', { detail: { message: serverMsg } }))
+        throw new Error(serverMsg)
+      }
+      await loadUserData(user)
+      setDataRefreshKey(k => k + 1)
+  // Close the AddEvent modal (if open) and switch to the Tasks tab so the user
+  // can immediately see the newly created task.
+  setIsAddEventOpen(false)
+  setActiveTab('tasks')
+      setSuccessMessage('Task created successfully')
+      setShowSuccessDialog(true)
+    } catch (e) {
+      console.error(e)
+      if (e instanceof Error) window.dispatchEvent(new CustomEvent('planiar:notify', { detail: { message: e.message } }))
     }
-
-    setUsers(users.map(u => {
-      if (u.email === user.email) {
-        return {
-          ...u,
-          classes: [...(u.classes || []), newClass]
-        }
-      }
-      return u
-    }))
   }
 
-  const updateClass = (classId: string, updates: any) => {
+  const updateTask = async (taskId: string | number, updates: any) => {
     if (!user) return
-
-    setUsers(users.map(u => {
-      if (u.email === user.email) {
-        return {
-          ...u,
-          classes: (u.classes || []).map(cls =>
-            cls.id === classId ? { ...cls, ...updates } : cls
-          )
-        }
-      }
-      return u
-    }))
-  }
-
-  const deleteClass = (classId: string) => {
-    if (!user) return
-
-    setUsers(users.map(u => {
-      if (u.email === user.email) {
-        return {
-          ...u,
-          classes: (u.classes || []).filter(cls => cls.id !== classId)
-        }
-      }
-      return u
-    }))
-  }
-
-  // Activity Management
-  const createActivity = (activityData: any) => {
-    if (!user) return
-
-    // For recurring activities, we'll store them differently
-    // but for now, we'll create task entries for each occurrence
-    const newActivity = {
-      ...activityData,
-      id: `activity-${Date.now()}`,
-      type: 'activity'
+    try {
+      const res = await fetch(APIPATH(`/tasks/${taskId}`), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      })
+      if (!res.ok) throw new Error('Failed to update task')
+      await loadUserData(user)
+      setDataRefreshKey(k => k + 1)
+      setSuccessMessage('Task updated successfully')
+      setShowSuccessDialog(true)
+    } catch (e) {
+      console.error(e)
     }
-
-    setUsers(users.map(u => {
-      if (u.email === user.email) {
-        return {
-          ...u,
-          activities: [...u.activities, newActivity]
-        }
-      }
-      return u
-    }))
-  }
-
-  // Task Management
-  const addTask = (newTask: any) => {
-    if (!user) return
-
-    const newTaskWithId = { 
-      ...newTask, 
-      id: Date.now(), 
-      status: 'pending' 
-    }
-
-    setUsers(users.map(u => {
-      if (u.email === user.email) {
-        return {
-          ...u,
-          activities: [...u.activities, newTaskWithId]
-        }
-      }
-      return u
-    }))
-  }
-
-  const updateTask = (taskId: string | number, updates: any) => {
-    if (!user) return
-
-    setUsers(users.map(u => {
-      if (u.email === user.email) {
-        return {
-          ...u,
-          activities: u.activities.map(task => 
-            task.id === taskId ? { ...task, ...updates } : task
-          )
-        }
-      }
-      return u
-    }))
   }
 
   const deleteTask = async (taskId: string | number) => {
     if (!user) return;
-
     try {
-  const response = await fetch(APIPATH(`/tasks/${taskId}`), {
+      const response = await fetch(APIPATH(`/tasks/${taskId}`), {
         method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to delete task');
-      }
-
-      console.log(`Task ${taskId} deleted successfully.`);
+      if (!response.ok) throw new Error('Failed to delete task');
+      await loadUserData(user)
+      setDataRefreshKey(k => k + 1)
+      setSuccessMessage('Task deleted successfully')
+      setShowSuccessDialog(true)
     } catch (error) {
       console.error(error);
     }
   }
 
-  // Upload Schedule Handler
-  const handleUploadSchedule = (scheduleData: any) => {
-    if (!user || !scheduleData.suggestions) return
-
-    setUsers(users.map(u => {
-      if (u.email === user.email) {
-        const newClasses: ClassItem[] = []
-        const newActivities: TaskActivity[] = []
-
-        scheduleData.suggestions.forEach((suggestion: any) => {
-          if (suggestion.type === 'class') {
-            newClasses.push({
-              ...suggestion,
-              id: `class-${Date.now()}-${Math.random()}`
-            })
-          } else if (suggestion.type === 'task' || suggestion.type === 'activity') {
-            newActivities.push({
-              ...suggestion,
-              id: Date.now() + Math.random(),
-              status: 'pending'
-            })
-          }
-        })
-
-        return {
-          ...u,
-          classes: [...(u.classes || []), ...newClasses],
-          activities: [...u.activities, ...newActivities]
+  // Upload Schedule Handler - POST suggestions to backend then refresh
+  const handleUploadSchedule = async (scheduleData: any) => {
+    if (!user || !scheduleData?.suggestions) return
+    try {
+      // POST suggestions to backend /schedule or similar endpoint if available
+      const res = await fetch(APIPATH('/schedule/upload'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id ?? user.email, suggestions: scheduleData.suggestions })
+      })
+      if (!res.ok) {
+        // if endpoint not available, try to individually create classes/activities
+        for (const suggestion of scheduleData.suggestions) {
+          if (suggestion.type === 'class') await createClass(suggestion)
+          else await createActivity(suggestion)
         }
+      } else {
+        await loadUserData(user)
       }
-      return u
-    }))
+    } catch (e) {
+      console.warn('Upload schedule failed, falling back to individual creation', e)
+      for (const suggestion of scheduleData.suggestions) {
+        if (suggestion.type === 'class') await createClass(suggestion)
+        else await createActivity(suggestion)
+      }
+    }
   }
 
   const handleLogin = (userData: any) => {
@@ -528,27 +375,42 @@ export default function App() {
     }
     setIsLoggedIn(true)
     setShowRegister(false)
+    // Load classes/activities for this user from backend
+    loadUserData(normalized)
   }
 
   const handleRegister = (userData: any) => {
-    const newUser = {
-      name: userData.name,
-      email: userData.email,
-      password: userData.password,
-      classes: [],
-      activities: []
+    // Register via backend if possible
+    const doRegister = async () => {
+      try {
+        const res = await fetch(APIPATH('/users'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(userData)
+        })
+        if (!res.ok) throw new Error('Registration failed')
+        const created = await res.json()
+        setUser(created)
+        localStorage.setItem('planiar_user', JSON.stringify(created))
+        localStorage.setItem('planiar_logged_in', '1')
+        setIsLoggedIn(true)
+        setShowRegister(false)
+        await loadUserData(created)
+      } catch (e) {
+        // Fallback: create a minimal local user object
+        const newUser = { name: userData.name, email: userData.email }
+        setUser(newUser as any)
+        try {
+          localStorage.setItem('planiar_user', JSON.stringify(newUser))
+          localStorage.setItem('planiar_logged_in', '1')
+        } catch (e) {
+          console.warn('Failed to persist user to localStorage', e)
+        }
+        setIsLoggedIn(true)
+        setShowRegister(false)
+      }
     }
-    
-    setUsers([...users, newUser])
-    setUser(newUser)
-    try {
-      localStorage.setItem('planiar_user', JSON.stringify(newUser))
-      localStorage.setItem('planiar_logged_in', '1')
-    } catch (e) {
-      console.warn('Failed to persist user to localStorage', e)
-    }
-    setIsLoggedIn(true)
-    setShowRegister(false)
+    doRegister()
   }
 
   const handleLogout = () => {
@@ -572,6 +434,8 @@ export default function App() {
         const parsed = JSON.parse(raw)
         setUser(parsed)
         setIsLoggedIn(true)
+        // load classes/activities for restored user
+        loadUserData(parsed)
       }
     } catch (e) {
       console.warn('Failed to restore user from localStorage', e)
@@ -591,8 +455,7 @@ export default function App() {
     />
   }
 
-  const userTasks = getUserTasks()
-  const userClasses = getUserClasses()
+  const userTasks = userActivities
 
   return (
     <div className="min-h-screen bg-background">
@@ -631,7 +494,12 @@ export default function App() {
               <UserAvatar 
                 user={user} 
                 onLogout={handleLogout}
-                onEditClasses={() => setIsEditClassesOpen(true)}
+                onEditClasses={() => {
+                  // When opening from the avatar, explicitly provide the current user's lists
+                  setSelectedClassesForDialog(userClasses)
+                  setSelectedActivitiesForDialog(userTasks)
+                  setIsEditClassesOpen(true)
+                }}
               />
             </div>
           </div>
@@ -666,6 +534,7 @@ export default function App() {
               userName={user?.name || ''}
               onAddTask={() => setIsAddEventOpen(true)}
               initialTasks={userTasks}
+              dataRefreshKey={dataRefreshKey}
             />
           </TabsContent>
 
@@ -676,14 +545,24 @@ export default function App() {
           </TabsContent>
 
           <TabsContent value="schedule" className="space-y-6">
-            <Schedule 
-              userId={user?.id}
-              onUpdateClass={updateClass}
-              onDeleteClass={deleteClass}
-              onEditClasses={() => setIsEditClassesOpen(true)}
-              existingClasses={userClasses}
-              existingActivities={userTasks}
-            />
+              <Schedule 
+                userId={user?.id}
+                onUpdateClass={updateClass}
+                onDeleteClass={deleteClass}
+                onDeleteActivity={deleteActivity}
+                // Accepts optional lists so Schedule can open the dialog with the current user's data
+                onEditClasses={(classes, activities, itemToEdit) => {
+                  // If the Schedule/Grid passes undefined (e.g. running in a mode that doesn't provide
+                  // the lists) fall back to the current user's lists so the dialog always shows data.
+                  console.debug('Schedule requested EditClasses dialog, classes:', classes?.length, 'activities:', activities?.length, 'itemToEdit:', !!itemToEdit)
+                  setSelectedClassesForDialog(classes ?? userClasses)
+                  setSelectedActivitiesForDialog(activities ?? userTasks)
+                  setSelectedItemForDialog(itemToEdit ?? null)
+                  setIsEditClassesOpen(true)
+                }}
+                existingClasses={userClasses}
+                existingActivities={userTasks}
+              />
           </TabsContent>
 
           <TabsContent value="tasks" className="space-y-6">
@@ -691,7 +570,8 @@ export default function App() {
             <TaskManager 
               userId={user.id}
               onUpdateTask={updateTask} 
-              onDeleteTask={deleteTask} 
+              onDeleteTask={deleteTask}
+              dataRefreshKey={dataRefreshKey}
             />
           )}
           </TabsContent>
@@ -715,12 +595,41 @@ export default function App() {
       {/* Edit Classes Dialog */}
       <EditClassesDialog
         open={isEditClassesOpen}
-        onOpenChange={setIsEditClassesOpen}
-        classes={userClasses}
+        onOpenChange={(open) => {
+          setIsEditClassesOpen(open)
+          if (!open) {
+            // clear any explicitly provided lists when dialog closes
+            setSelectedClassesForDialog(null)
+            setSelectedActivitiesForDialog(null)
+            setSelectedItemForDialog(null)
+          }
+        }}
+        classes={selectedClassesForDialog ?? userClasses}
+        activities={selectedActivitiesForDialog ?? userTasks}
         onEditClass={updateClass}
         onDeleteClass={deleteClass}
         onCreateClass={createClass}
+        onUploadSchedule={handleUploadSchedule}
+        onEditActivity={updateActivity}
+        onDeleteActivity={deleteActivity}
+        onCreateActivity={createActivity}
+        initialEditItem={selectedItemForDialog}
       />
+
+      {/* Success confirmation dialog for class CRUD actions */}
+      <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{successMessage ?? 'Operation completed'}</DialogTitle>
+          </DialogHeader>
+          <div className="pt-4" />
+          <DialogFooter>
+            <Button onClick={() => setShowSuccessDialog(false)} className="bg-[#7B61FF] hover:bg-[#6B51EF]">
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

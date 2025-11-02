@@ -28,9 +28,10 @@ interface TaskManagerProps {
   userId: number | undefined
   onUpdateTask: (taskId: number | string, updates: Partial<TaskForUI>) => void
   onDeleteTask: (taskId: number | string) => void
+  dataRefreshKey?: number
 }
 
-export function TaskManager({ userId, onUpdateTask, onDeleteTask }: TaskManagerProps) {
+export function TaskManager({ userId, onUpdateTask, onDeleteTask, dataRefreshKey }: TaskManagerProps) {
   const [tasks, setTasks] = useState<TaskForUI[]>([])
   const [classNames, setClassNames] = useState<Record<number, string>>({})
   const [loading, setLoading] = useState(true)
@@ -64,19 +65,47 @@ export function TaskManager({ userId, onUpdateTask, onDeleteTask }: TaskManagerP
       setTasks(mappedTasks)
 
       // ✅ Obtener los nombres de clase para los classId distintos
-      const classIds = Array.from(new Set(
-        data.map(t => t.classId).filter((id): id is number => id !== undefined)
-      ))
-
+      // En lugar de hacer una llamada por cada id (puede producir 404 en backend si la clase no existe),
+      // hacemos una sola petición user-scoped para traer las clases del usuario y construir el mapa.
       const classNamesMap: Record<number, string> = {}
-      await Promise.all(classIds.map(async id => {
-        try {
-          const res = await fetch(APIPATH(`/classes/${id}`))
-          if (!res.ok) return
-          const cls = await res.json()
-          classNamesMap[id] = cls.title
-        } catch {}
-      }))
+      try {
+        const classesRes = await fetch(APIPATH(`/classes/user/${userId}`))
+        if (classesRes.ok) {
+          const classesData: any[] = await classesRes.json()
+          for (const cls of classesData) {
+            if (cls && (cls.id !== undefined && cls.id !== null)) {
+              classNamesMap[Number(cls.id)] = cls.title
+            }
+          }
+        } else {
+          // If the user-scoped endpoint is not available, silently fall back to per-id attempts
+          // (this keeps previous behavior but avoids throwing)
+          const classIds = Array.from(new Set(
+            data.map(t => t.classId).filter((id): id is number => id !== undefined)
+          ))
+          await Promise.all(classIds.map(async id => {
+            try {
+              const res = await fetch(APIPATH(`/classes/${id}`))
+              if (!res.ok) return
+              const cls = await res.json()
+              classNamesMap[id] = cls.title
+            } catch {}
+          }))
+        }
+      } catch (e) {
+        console.warn('Failed to fetch classes for user, falling back to per-id fetches', e)
+        const classIds = Array.from(new Set(
+          data.map(t => t.classId).filter((id): id is number => id !== undefined)
+        ))
+        await Promise.all(classIds.map(async id => {
+          try {
+            const res = await fetch(APIPATH(`/classes/${id}`))
+            if (!res.ok) return
+            const cls = await res.json()
+            classNamesMap[id] = cls.title
+          } catch {}
+        }))
+      }
       setClassNames(classNamesMap)
 
       // ✅ Actualizar subject en cada task
@@ -95,7 +124,7 @@ export function TaskManager({ userId, onUpdateTask, onDeleteTask }: TaskManagerP
 
   useEffect(() => {
     fetchTasks()
-  }, [userId])
+  }, [userId, dataRefreshKey])
 
   const handleStatusChange = async (taskId: number, newStatus: TaskForUI['status']) => {
     try {
@@ -199,7 +228,7 @@ export function TaskManager({ userId, onUpdateTask, onDeleteTask }: TaskManagerP
     <div className="space-y-6">
       <div className="space-y-2">
         <h1 className="text-[#2B2B2B] dark:text-white" style={{ fontSize: '30px', fontWeight: '600' }}>Task Manager</h1>
-        <p className="text-[#555555] dark:text-gray-400" style={{ fontSize: '16px' }}>All your tasks and activities in one place.</p>
+        <p className="text-[#555555] dark:text-gray-400" style={{ fontSize: '16px' }}>All your tasks in one place.</p>
       </div>
 
       {/* Filters and Search */}

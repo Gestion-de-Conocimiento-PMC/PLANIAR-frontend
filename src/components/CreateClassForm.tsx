@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { APIPATH } from '../lib/api'
+// CreateClassForm: build payload and delegate network to parent via onSubmit
 import { ChevronLeft } from 'lucide-react'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
@@ -34,21 +34,36 @@ interface CreateClassFormProps {
   onBack: () => void
   userId: number | null
   initialData?: any
+  // mode: 'create' | 'edit' - when editing, hide ICS/AI tab and change titles
+  mode?: 'create' | 'edit'
+  // Optional handler for uploading a schedule (.ics) and creating classes from it
+  onUploadSchedule?: (data: any) => void
 }
 
-export function CreateClassForm({ onSubmit, onBack, userId, initialData }: CreateClassFormProps) {
+export function CreateClassForm({ onSubmit, onBack, userId, initialData, mode, onUploadSchedule }: CreateClassFormProps) {
   const [title, setTitle] = useState(initialData?.title || '')
   const [selectedDays, setSelectedDays] = useState<number[]>(initialData?.days || [])
   const [daySchedule, setDaySchedule] = useState<Record<
     number,
     { start: string; end: string; room: string; professor: string }
   >>(initialData?.daySchedule || {})
+  // Helpers for applying same values across selected days
+  const [sameProfessorActive, setSameProfessorActive] = useState(false)
+  const [sameRoomActive, setSameRoomActive] = useState(false)
+  const [sameTimeActive, setSameTimeActive] = useState(false)
+  const [globalProfessor, setGlobalProfessor] = useState(initialData?.professor || '')
+  const [globalRoom, setGlobalRoom] = useState(initialData?.room || '')
+  const [globalStart, setGlobalStart] = useState('')
+  const [globalEnd, setGlobalEnd] = useState('')
   const [dateFrom, setDateFrom] = useState(initialData?.startDate || '')
   const [dateTo, setDateTo] = useState(initialData?.endDate || '')
   const [selectedColor, setSelectedColor] = useState(initialData?.color || PRESET_COLORS[0].value)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
-  const [inputMode, setInputMode] = useState<'manual' | 'ics'>('manual')
+  const isEditMode = mode === 'edit' || !!initialData
+  const [inputMode, setInputMode] = useState<'manual' | 'ics'>(isEditMode ? 'manual' : 'manual')
+  const [icsSuggestions, setIcsSuggestions] = useState<any[] | null>(null)
+  const [showIcsSuggestions, setShowIcsSuggestions] = useState(false)
 
   const handleDayToggle = (dayId: number) => {
     setSelectedDays((prev) =>
@@ -77,16 +92,17 @@ export function CreateClassForm({ onSubmit, onBack, userId, initialData }: Creat
   }
 
   const handleAIAnalysis = (data: any) => {
-    console.log('AI Analysis:', data)
+    // Save suggestions from ICS analysis so user can confirm creation
+    // `data` shape: { linkedClass?, items?: [...] }
+    const items = data?.items || []
+    setIcsSuggestions(items)
+    setShowIcsSuggestions(true)
   }
-
   const handleSubmit = async () => {
     if (!validate()) return
     setLoading(true)
 
     try {
-      if (!userId) throw new Error('User not found')
-
       const payload = {
         title,
         days: DAYS_OF_WEEK.map(d => selectedDays.includes(d.id) ? '1' : '0').join(','),
@@ -97,37 +113,87 @@ export function CreateClassForm({ onSubmit, onBack, userId, initialData }: Creat
         startDate: dateFrom,
         endDate: dateTo,
         color: selectedColor,
-        user: { id: userId },
+        // userId is provided by the backend route when creating (POST /api/classes/user/{userId})
+        id: initialData?.id,
       }
 
-  const res = await fetch(APIPATH(`/classes/user/${userId}`), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error || 'Error creating class')
-      }
+      if (onSubmit) onSubmit(payload)
 
-      const result = await res.json()
-      alert('✅ Class created successfully')
-      if (onSubmit) onSubmit(result)
-
-      // Limpiar formulario
+      // Reset form
       setTitle('')
       setSelectedDays([])
       setDaySchedule({})
       setDateFrom('')
       setDateTo('')
       setSelectedColor(PRESET_COLORS[0].value)
-
     } catch (error: any) {
-      alert(error.message)
-      console.error('❌ Error creating class:', error)
+      console.error('❌ Error preparing class payload:', error)
     } finally {
       setLoading(false)
     }
+  }
+
+  // Toggle helpers: when enabling a "same X" option, capture current value from the
+  // first selected day (if any) and apply it to all selected days so the per-day inputs
+  // can be hidden and the user only needs to pick days.
+  const toggleSameProfessor = () => {
+    setSameProfessorActive((prev) => {
+      const next = !prev
+      if (next && selectedDays.length > 0) {
+        const first = selectedDays[0]
+        const existing = daySchedule[first]?.professor || ''
+        setGlobalProfessor(existing || globalProfessor)
+        // apply to all selected days immediately
+        setDaySchedule(prevSched => {
+          const copy = { ...prevSched }
+          selectedDays.forEach(d => {
+            copy[d] = { ...(copy[d] || { start: '', end: '', room: '', professor: '' }), professor: existing || globalProfessor }
+          })
+          return copy
+        })
+      }
+      return next
+    })
+  }
+
+  const toggleSameRoom = () => {
+    setSameRoomActive((prev) => {
+      const next = !prev
+      if (next && selectedDays.length > 0) {
+        const first = selectedDays[0]
+        const existing = daySchedule[first]?.room || ''
+        setGlobalRoom(existing || globalRoom)
+        setDaySchedule(prevSched => {
+          const copy = { ...prevSched }
+          selectedDays.forEach(d => {
+            copy[d] = { ...(copy[d] || { start: '', end: '', room: '', professor: '' }), room: existing || globalRoom }
+          })
+          return copy
+        })
+      }
+      return next
+    })
+  }
+
+  const toggleSameTime = () => {
+    setSameTimeActive((prev) => {
+      const next = !prev
+      if (next && selectedDays.length > 0) {
+        const first = selectedDays[0]
+        const existingStart = daySchedule[first]?.start || ''
+        const existingEnd = daySchedule[first]?.end || ''
+        setGlobalStart(existingStart || globalStart)
+        setGlobalEnd(existingEnd || globalEnd)
+        setDaySchedule(prevSched => {
+          const copy = { ...prevSched }
+          selectedDays.forEach(d => {
+            copy[d] = { ...(copy[d] || { start: '', end: '', room: '', professor: '' }), start: existingStart || globalStart, end: existingEnd || globalEnd }
+          })
+          return copy
+        })
+      }
+      return next
+    })
   }
 
   return (
@@ -138,20 +204,21 @@ export function CreateClassForm({ onSubmit, onBack, userId, initialData }: Creat
             <ChevronLeft className="w-5 h-5" />
           </Button>
           <div>
-            <DialogTitle>Create Class</DialogTitle>
-            <DialogDescription>Add a recurring class to your schedule</DialogDescription>
+            <DialogTitle>{isEditMode ? 'Edit Class' : 'Create Class'}</DialogTitle>
+            <DialogDescription>{isEditMode ? 'Edit the class details' : 'Add a recurring class to your schedule'}</DialogDescription>
           </div>
         </div>
       </DialogHeader>
 
       {/* Manual / ICS Tabs */}
       <Tabs value={inputMode} onValueChange={(v: any) => setInputMode(v)} className="mt-4">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className={`grid w-full ${isEditMode ? 'grid-cols-1' : 'grid-cols-2'}`}>
           <TabsTrigger value="manual">Manual</TabsTrigger>
-          <TabsTrigger value="ics">ics</TabsTrigger>
+          {!isEditMode && <TabsTrigger value="ics">ics</TabsTrigger>}
         </TabsList>
 
-        <TabsContent value="ics" className="mt-4 space-y-4">
+        {!isEditMode && (
+          <TabsContent value="ics" className="mt-4 space-y-4">
           {ICS_TUTORIAL_URL ? (
             (() => {
               const url = ICS_TUTORIAL_URL.trim()
@@ -215,14 +282,49 @@ export function CreateClassForm({ onSubmit, onBack, userId, initialData }: Creat
             <div className="mb-4 text-sm text-muted-foreground">Upload classes with a ICS file — tutorial soon...</div>
           )}
 
-          <AIUploadView
-            onAnalysisComplete={handleAIAnalysis}
-            analysisType="class"
-            description="Upload your class syllabus or schedule"
-          />
-        </TabsContent>
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-lg font-medium">upload your schedule ics file</h3>
+              <p className="text-sm text-muted-foreground">Supports only .ics files</p>
+            </div>
 
-        <TabsContent value="manual" className="mt-4">
+            <AIUploadView
+              onAnalysisComplete={handleAIAnalysis}
+              analysisType="schedule"
+              description="Supports only .ics files"
+            />
+
+            {/* After analysis: show suggestions summary and create button */}
+            {showIcsSuggestions && icsSuggestions && (
+              <div className="mt-4 space-y-3">
+                <div className="text-sm text-muted-foreground">Found {icsSuggestions.length} items in the uploaded .ics</div>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => { setShowIcsSuggestions(false); setIcsSuggestions(null) }}>Cancel</Button>
+                  <Button
+                    onClick={() => {
+                      // Delegate the bulk creation to the parent upload handler if provided
+                      if (typeof onUploadSchedule === 'function') {
+                        onUploadSchedule({ parentClass: null, suggestions: icsSuggestions })
+                      } else if (typeof onSubmit === 'function') {
+                        // fallback: pass through to onSubmit so parent can handle it
+                        onSubmit({ parentClass: null, suggestions: icsSuggestions })
+                      }
+                      // close suggestions view
+                      setShowIcsSuggestions(false)
+                      setIcsSuggestions(null)
+                    }}
+                    className="bg-[#7B61FF] hover:bg-[#6B51EF]"
+                  >
+                    Create Classes
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </TabsContent>
+    )}
+
+    <TabsContent value="manual" className="mt-4">
           <div className="space-y-6 max-h-[50vh] overflow-y-auto pr-2" style={{
             scrollbarWidth: 'none',
             msOverflowStyle: 'none'
@@ -270,71 +372,201 @@ export function CreateClassForm({ onSubmit, onBack, userId, initialData }: Creat
               {errors.days && <p className="text-sm text-destructive">{errors.days}</p>}
             </div>
 
+            {/* Quick apply controls for same professor/room/time across selected days */}
+            <div className="space-y-3">
+              <Label>Quick settings (optional)</Label>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant={sameProfessorActive ? 'default' : 'outline'} onClick={toggleSameProfessor}>
+                  Same professor for all days
+                </Button>
+                <Button type="button" variant={sameRoomActive ? 'default' : 'outline'} onClick={toggleSameRoom}>
+                  Same room for all days
+                </Button>
+                <Button type="button" variant={sameTimeActive ? 'default' : 'outline'} onClick={toggleSameTime}>
+                  Same time for all days
+                </Button>
+              </div>
+
+              {/* Professor apply panel (English labels) */}
+              {sameProfessorActive && (
+                <div className="mt-2 grid grid-cols-1 gap-2">
+                  <div>
+                    <Label className="text-xs">Professor</Label>
+                    <Input placeholder="e.g., Dr. John Doe" value={globalProfessor} onChange={e => {
+                      const v = e.target.value
+                      setGlobalProfessor(v)
+                      // auto-apply as the user types when toggle is active
+                      if (selectedDays.length > 0) {
+                        setDaySchedule(prev => {
+                          const copy = { ...prev }
+                          selectedDays.forEach(d => {
+                            copy[d] = { ...(copy[d] || { start: '', end: '', room: '', professor: '' }), professor: v }
+                          })
+                          return copy
+                        })
+                      }
+                    }} />
+                    <p className="text-xs text-muted-foreground mt-1">Values are applied automatically to selected days.</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Room apply panel (English labels) */}
+              {sameRoomActive && (
+                <div className="mt-2 grid grid-cols-1 gap-2">
+                  <div>
+                    <Label className="text-xs">Room</Label>
+                    <Input placeholder="e.g., AU_001" value={globalRoom} onChange={e => {
+                      const v = e.target.value
+                      setGlobalRoom(v)
+                      if (selectedDays.length > 0) {
+                        setDaySchedule(prev => {
+                          const copy = { ...prev }
+                          selectedDays.forEach(d => {
+                            copy[d] = { ...(copy[d] || { start: '', end: '', room: '', professor: '' }), room: v }
+                          })
+                          return copy
+                        })
+                      }
+                    }} />
+                    <p className="text-xs text-muted-foreground mt-1">Values are applied automatically to selected days.</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Time apply panel (English labels) */}
+              {sameTimeActive && (
+                <div className="mt-2 grid grid-cols-2 gap-3 items-end">
+                  <div>
+                    <Label className="text-xs">Start</Label>
+                    <Input type="time" value={globalStart} onChange={e => {
+                      const v = e.target.value
+                      setGlobalStart(v)
+                      if (selectedDays.length > 0) {
+                        setDaySchedule(prev => {
+                          const copy = { ...prev }
+                          selectedDays.forEach(d => {
+                            copy[d] = { ...(copy[d] || { start: '', end: '', room: '', professor: '' }), start: v }
+                          })
+                          return copy
+                        })
+                      }
+                    }} />
+                  </div>
+                  <div>
+                    <Label className="text-xs">End</Label>
+                    <Input type="time" value={globalEnd} onChange={e => {
+                      const v = e.target.value
+                      setGlobalEnd(v)
+                      if (selectedDays.length > 0) {
+                        setDaySchedule(prev => {
+                          const copy = { ...prev }
+                          selectedDays.forEach(d => {
+                            copy[d] = { ...(copy[d] || { start: '', end: '', room: '', professor: '' }), end: v }
+                          })
+                          return copy
+                        })
+                      }
+                    }} />
+                  </div>
+                  <div className="col-span-2">
+                    <p className="text-xs text-muted-foreground mt-1">Times are applied automatically to selected days.</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Schedule for Each Day */}
             {selectedDays.length > 0 && (
               <div className="space-y-3">
                 <Label>Schedule for Each Day</Label>
 
-                <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
-                  {selectedDays.map((dayId) => {
-                    const day = DAYS_OF_WEEK.find(d => d.id === dayId)
-                    return (
-                      <div key={dayId} className="space-y-3 pb-3 border-b last:border-b-0 last:pb-0">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="secondary" className="bg-[#7B61FF] text-white">
-                            {day?.label}
-                          </Badge>
-                        </div>
-                        
-                        {/* Time Inputs - Only Start and End */}
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-1">
-                            <Label className="text-xs text-muted-foreground">Start Time</Label>
-                            <Input
-                              type="time"
-                              placeholder="Start"
-                              value={daySchedule[dayId]?.start || ''}
-                              onChange={(e) => handleScheduleChange(dayId, 'start', e.target.value)}
-                            />
+                {/* If any "same" option is active we hide the detailed per-day inputs and
+                    show a compact summary — values have already been applied to daySchedule */}
+                {(sameProfessorActive || sameRoomActive || sameTimeActive) ? (
+                  <div className="space-y-2 border rounded-lg p-4 bg-muted/30">
+                    <p className="text-sm text-muted-foreground">Compact view: same settings are active — pick days only. Applied values shown below.</p>
+                    <div className="mt-2 grid grid-cols-1 gap-2">
+                      {selectedDays.map((dayId) => {
+                        const day = DAYS_OF_WEEK.find(d => d.id === dayId)
+                        const info = daySchedule[dayId] || { start: '', end: '', room: '', professor: '' }
+                        return (
+                          <div key={dayId} className="flex items-center justify-between gap-4 p-2 rounded bg-white/5">
+                            <div className="flex items-center gap-3">
+                              <Badge variant="secondary" className="bg-[#7B61FF] text-white">{day?.label}</Badge>
+                              <div className="text-sm text-muted-foreground">
+                                { (info.start || info.end) ? `${info.start || ''}${info.start && info.end ? ' - ' : ''}${info.end || ''}` : (sameTimeActive ? `${globalStart || ''}${globalStart && globalEnd ? ' - ' : ''}${globalEnd || ''}` : '') }
+                                { (sameProfessorActive || info.professor) && <div>Prof: {info.professor || globalProfessor}</div> }
+                                { (sameRoomActive || info.room) && <div>Room: {info.room || globalRoom}</div> }
+                              </div>
+                            </div>
                           </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs text-muted-foreground">End Time</Label>
-                            <Input
-                              type="time"
-                              placeholder="End"
-                              value={daySchedule[dayId]?.end || ''}
-                              onChange={(e) => handleScheduleChange(dayId, 'end', e.target.value)}
-                            />
+                        )
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
+                    {selectedDays.map((dayId) => {
+                      const day = DAYS_OF_WEEK.find(d => d.id === dayId)
+                      return (
+                        <div key={dayId} className="space-y-3 pb-3 border-b last:border-b-0 last:pb-0">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="secondary" className="bg-[#7B61FF] text-white">
+                              {day?.label}
+                            </Badge>
                           </div>
-                        </div>
+                          
+                          {/* Time Inputs - Only Start and End */}
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <Label className="text-xs text-muted-foreground">Start Time</Label>
+                              <Input
+                                type="time"
+                                placeholder="Start"
+                                value={daySchedule[dayId]?.start || ''}
+                                onChange={(e) => handleScheduleChange(dayId, 'start', e.target.value)}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs text-muted-foreground">End Time</Label>
+                              <Input
+                                type="time"
+                                placeholder="End"
+                                value={daySchedule[dayId]?.end || ''}
+                                onChange={(e) => handleScheduleChange(dayId, 'end', e.target.value)}
+                              />
+                            </div>
+                          </div>
 
-                        {/* Room & Professor for this specific day */}
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-1">
-                            <Label className="text-xs text-muted-foreground">Room</Label>
-                            <Input
-                              placeholder="e.g., Room 305"
-                              value={daySchedule[dayId]?.room || ''}
-                              onChange={(e) => handleScheduleChange(dayId, 'room', e.target.value)}
-                            />
+                          {/* Room & Professor for this specific day */}
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <Label className="text-xs text-muted-foreground">Room</Label>
+                              <Input
+                                placeholder="e.g., Room 305"
+                                value={daySchedule[dayId]?.room || ''}
+                                onChange={(e) => handleScheduleChange(dayId, 'room', e.target.value)}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs text-muted-foreground">Professor</Label>
+                              <Input
+                                placeholder="e.g., Dr. Smith"
+                                value={daySchedule[dayId]?.professor || ''}
+                                onChange={(e) => handleScheduleChange(dayId, 'professor', e.target.value)}
+                              />
+                            </div>
                           </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs text-muted-foreground">Professor</Label>
-                            <Input
-                              placeholder="e.g., Dr. Smith"
-                              value={daySchedule[dayId]?.professor || ''}
-                              onChange={(e) => handleScheduleChange(dayId, 'professor', e.target.value)}
-                            />
-                          </div>
-                        </div>
 
-                        {errors[`time_${dayId}`] && (
-                          <p className="text-sm text-destructive">{errors[`time_${dayId}`]}</p>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
+                          {errors[`time_${dayId}`] && (
+                            <p className="text-sm text-destructive">{errors[`time_${dayId}`]}</p>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             )}
 

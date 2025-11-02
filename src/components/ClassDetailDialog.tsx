@@ -41,7 +41,10 @@ export function ClassDetailDialog({
   if (!classData) return null
 
   // Normalize days into an array of day keys like ['monday','tuesday']
-  const DAYS_ORDER = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday']
+  // Use Sunday-first ordering so CSV bitmasks like "0,1,0,0,0,0,0" map correctly
+  // (index 0 = Sunday, 1 = Monday, ...). This aligns with the rest of the code where
+  // day indices are 0..6 starting at Sunday.
+  const DAYS_ORDER = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday']
   const normalizedDays: string[] = (() => {
     const d = (classData as any).days
     if (!d) return []
@@ -127,15 +130,17 @@ export function ClassDetailDialog({
               <div>
                 <p className="text-sm text-muted-foreground mb-2">Schedule</p>
                 <div className="space-y-2">
-                  {Object.entries(dayTimesObj).map(([day, times]: [string, any]) => (
-                    <div key={day} className="flex items-center gap-2">
-                      <Clock className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-sm">
-                        <span className="font-medium">{DAYS_MAP[day] ?? day}:</span>{' '}
-                        {times.start} - {times.end}
-                      </span>
-                    </div>
-                  ))}
+                  {Object.entries(dayTimesObj)
+                    .filter(([day]) => normalizedDays.includes(day))
+                    .map(([day, times]: [string, any]) => (
+                      <div key={day} className="flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm">
+                          <span className="font-medium">{DAYS_MAP[day] ?? day}:</span>{' '}
+                          {times.start} - {times.end}
+                        </span>
+                      </div>
+                    ))}
                 </div>
               </div>
             )}
@@ -177,13 +182,14 @@ export function ClassDetailDialog({
       {/* Delete Confirmation */}
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Class</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete "{classData.title}"? This will remove all
-              recurring sessions from your schedule. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{classData.itemType === 'activity' ? 'Delete Activity' : 'Delete Class'}</AlertDialogTitle>
+              <AlertDialogDescription>
+                {classData.itemType === 'activity'
+                  ? `Are you sure you want to delete "${classData.title}"? This will remove the activity from your schedule. This action cannot be undone.`
+                  : `Are you sure you want to delete "${classData.title}"? This will remove all recurring sessions from your schedule. This action cannot be undone.`}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction

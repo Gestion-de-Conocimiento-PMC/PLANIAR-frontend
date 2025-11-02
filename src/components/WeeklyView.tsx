@@ -284,12 +284,17 @@ export function WeeklyView({ userId }: WeeklyViewProps) {
                           {dayActivities.map((item, idx) => (
                             <div
                               key={`activity-${idx}`}
-                              className="p-3 rounded-lg border bg-background hover:shadow-sm transition-all"
+                              className="p-3 rounded-lg border hover:shadow-sm transition-all"
+                              style={{
+                                backgroundColor: item.color ? `${item.color}15` : undefined,
+                                borderColor: item.color || '#7B61FF',
+                                borderWidth: 1
+                              }}
                             >
                               <div className="flex items-center justify-between mb-1">
-                                <p className="font-medium text-sm">{item.title}</p>
-                                <Badge className="text-xs bg-[#1E90FF]/10 text-[#1E90FF]">
-                                  {item.startTimes.split(',')[date.getDay()] || 'TBD'}
+                                <p className="font-medium text-sm" style={{ color: item.color || '#7B61FF' }}>{item.title}</p>
+                                <Badge className="text-xs" style={{ backgroundColor: (item.color || '#1E90FF') + '10', color: item.color || '#1E90FF' }}>
+                                  {String(item.startTimes || '').split(',')[date.getDay()] || 'TBD'}
                                 </Badge>
                               </div>
                               {item.description && <p className="text-xs text-muted-foreground mt-1">{item.description}</p>}

@@ -87,7 +87,7 @@ export function TaskEditDialog({ task, onUpdateTask, children, onRefresh }: Task
       setIsOpen(false)
     } catch (error) {
       console.error(error)
-      alert('Error updating task')
+      window.dispatchEvent(new CustomEvent('planiar:notify', { detail: { message: 'Error updating task' } }))
     }
   }
 

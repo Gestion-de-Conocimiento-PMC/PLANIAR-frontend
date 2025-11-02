@@ -10,13 +10,15 @@ interface ScheduleGridProps {
   userId: number | null
   onUpdateClass?: (id: string, updates: any) => void
   onDeleteClass?: (id: string) => void
-  onEditClasses?: () => void
+  onDeleteActivity?: (id: string | number) => void
+  onEditClasses?: (classes?: any[], activities?: any[], itemToEdit?: any) => void
   // For local/mock mode (no userId) the parent can pass existing classes/activities
   existingClasses?: any[]
   existingActivities?: any[]
+  dataRefreshKey?: number
 }
 
-export function ScheduleGrid({ weekDates, userId, onUpdateClass, onDeleteClass, onEditClasses, existingClasses, existingActivities }: ScheduleGridProps) {
+export function ScheduleGrid({ weekDates, userId, onUpdateClass, onDeleteClass, onDeleteActivity, onEditClasses, existingClasses, existingActivities, dataRefreshKey }: ScheduleGridProps) {
   const [classes, setClasses] = useState<any[]>([])
   const [activities, setActivities] = useState<any[]>([])
   const [selectedClass, setSelectedClass] = useState<any>(null)
@@ -122,6 +124,44 @@ export function ScheduleGrid({ weekDates, userId, onUpdateClass, onDeleteClass, 
     fetchWeekData()
   }, [userId, weekDates])
 
+  // Re-fetch when parent signals data changes (create/update/delete)
+  useEffect(() => {
+    if (dataRefreshKey === undefined) return
+    // Trigger the same fetch logic by calling the async fetchWeekData defined above.
+    // We duplicate a small fetch here to avoid hoisting fetchWeekData out of the effect.
+    const run = async () => {
+      if (!userId) return
+      setLoading(true)
+      const fetchedClasses: any[] = []
+      const fetchedActivities: any[] = []
+
+      for (const date of weekDates) {
+        const dateStr = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())).toISOString().slice(0,10)
+        try {
+          const [classesRes, activitiesRes] = await Promise.all([
+            fetch(APIPATH(`/classes/user/${userId}/date/${dateStr}`)),
+            fetch(APIPATH(`/activities/user/${userId}/date/${dateStr}`))
+          ])
+          if (classesRes.ok) {
+            const dayClasses = await classesRes.json()
+            fetchedClasses.push(...dayClasses)
+          }
+          if (activitiesRes.ok) {
+            const dayActivities = await activitiesRes.json()
+            fetchedActivities.push(...dayActivities)
+          }
+        } catch (err) {
+          console.error('Error fetching data on refresh:', err)
+        }
+      }
+
+      setClasses(fetchedClasses)
+      setActivities(fetchedActivities)
+      setLoading(false)
+    }
+    run()
+  }, [dataRefreshKey])
+
   const getItemsForDay = (date: Date) => {
     const items: any[] = []
     const dayIndex = date.getDay() // domingo=0
@@ -194,7 +234,7 @@ export function ScheduleGrid({ weekDates, userId, onUpdateClass, onDeleteClass, 
     })
 
     // Actividades (support same shapes)
-    activities.forEach(act => {
+  activities.forEach(act => {
       const dayKey = DAYS_ORDER[dayIndex]
 
       let isActive = false
@@ -239,7 +279,8 @@ export function ScheduleGrid({ weekDates, userId, onUpdateClass, onDeleteClass, 
       if (!startTimeStr || !endTimeStr) return
       const startHour = parseTime(startTimeStr)
       const duration = parseTime(endTimeStr) - startHour
-      items.push({ ...act, startHour, duration, itemType: 'task' })
+      // Mark as activity so the renderer can use the same visual component as classes
+      items.push({ ...act, startHour, duration, itemType: 'activity' })
     })
 
     return items
@@ -258,11 +299,18 @@ export function ScheduleGrid({ weekDates, userId, onUpdateClass, onDeleteClass, 
 
   const handleEditClass = () => {
     setIsClassDetailOpen(false)
-    if (onEditClasses) onEditClasses()
+    if (onEditClasses) onEditClasses(existingClasses, existingActivities, selectedClass)
   }
 
   const handleDeleteClass = () => {
-    if (selectedClass && onDeleteClass) onDeleteClass(selectedClass.id)
+    if (!selectedClass) return
+    // If the selected item is an activity, call onDeleteActivity if provided;
+    // otherwise, call onDeleteClass. This ensures we use the correct backend route.
+    if (selectedClass.itemType === 'activity') {
+      if (onDeleteActivity) onDeleteActivity(selectedClass.id)
+    } else {
+      if (onDeleteClass) onDeleteClass(selectedClass.id)
+    }
   }
 
   return (
@@ -308,7 +356,7 @@ export function ScheduleGrid({ weekDates, userId, onUpdateClass, onDeleteClass, 
                             const topPosition = item.startHour * heightPerHour
                             return (
                               <div key={idy} className="absolute" style={{ top:`${topPosition}px`, left:'4px', right:'4px', zIndex: item.itemType === 'class' ? 15 : 10 }}>
-                                {item.itemType === 'class' ?
+                                {(item.itemType === 'class' || item.itemType === 'activity') ?
                                   <ClassBlock
                                     classData={item}
                                     startHour={item.startHour}

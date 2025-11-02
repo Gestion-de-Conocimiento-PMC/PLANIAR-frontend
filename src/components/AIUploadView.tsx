@@ -121,7 +121,7 @@ export function AIUploadView({ onAnalysisComplete, analysisType, description }: 
           <input
             id="ai-file-upload"
             type="file"
-            accept=".pdf,.doc,.docx,.xlsx,.xls,.png,.jpg,.jpeg"
+            accept={analysisType === 'schedule' ? '.ics' : '.pdf,.doc,.docx,.xlsx,.xls,.png,.jpg,.jpeg'}
             onChange={handleFileChange}
             className="hidden"
           />
@@ -145,7 +145,7 @@ export function AIUploadView({ onAnalysisComplete, analysisType, description }: 
                 </div>
                 <div className="mt-4 pt-4 border-t border-dashed border-muted-foreground/20">
                   <p className="text-xs text-muted-foreground">
-                    Supported: PDF, DOCX, XLSX, Images (max 10MB)
+                    {analysisType === 'schedule' ? 'Supported: .ics files only' : 'Supported: PDF, DOCX, XLSX, Images (max 10MB)'}
                   </p>
                 </div>
               </div>
@@ -156,7 +156,7 @@ export function AIUploadView({ onAnalysisComplete, analysisType, description }: 
             <Button
               size="sm"
               variant="ghost"
-              onClick={(e: React.FormEvent<HTMLFormElement>) => {
+              onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
                 e.preventDefault()
                 removeFile()
               }}

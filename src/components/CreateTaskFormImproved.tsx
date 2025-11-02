@@ -79,22 +79,10 @@ export function CreateTaskFormImproved({ onSubmit, onBack, userId }: CreateTaskF
         user: { id: userId },
       }
 
-  const response = await fetch(APIPATH(`/tasks/user/${userId}`), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(taskPayload),
-      })
+      // Delegate creation to parent via onSubmit so App can centralize API calls
+      if (onSubmit) onSubmit(taskPayload)
 
-      if (!response.ok) {
-        const err = await response.json()
-        throw new Error(err.error || 'Error creating task')
-      }
-
-      const result = await response.json()
-      alert('✅ Task created successfully')
-      if (onSubmit) onSubmit(result)
-
-      // Limpiar formulario
+      // Clear form
       setTitle('')
       setClassId(null)
       setPriority('Medium')
@@ -102,7 +90,7 @@ export function CreateTaskFormImproved({ onSubmit, onBack, userId }: CreateTaskF
       setEstimatedTime('')
       setDescription('')
     } catch (error: any) {
-      alert(error.message)
+      window.dispatchEvent(new CustomEvent('planiar:notify', { detail: { message: error.message || 'Error creating task' } }))
       console.error('❌ Error creating task:', error)
     } finally {
       setLoading(false)
