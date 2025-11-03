@@ -116,7 +116,8 @@ export function UserAvatar({ user, onLogout, onEditClasses }: UserAvatarProps) {
                   if (m) d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
                   else d = new Date(s)
                   if (isNaN(d.getTime())) return s
-                  return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+                  // Show full date in English (month name in English): day, month (long) and year.
+                  return d.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })
                 })()}
               </p>
             </div>
