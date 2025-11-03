@@ -492,10 +492,11 @@ html {
   background: var(--card);
 }
 
-/* Scrollable Area - Both vertical and horizontal scroll */
+/* Scrollable Area - Vertical scroll only; horizontal scrolling happens in inner containers */
 .schedule-scrollable-area {
   height: 100%;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
   position: relative;
 }
 
@@ -526,6 +527,15 @@ html {
 /* Headers Grid - Contains all weeks */
 .schedule-headers-grid {
   display: flex;
+  min-width: max-content;
+}
+
+/* Horizontal scrollers for headers and days. These are synced in JS so the time column can remain fixed. */
+.schedule-headers-scrollable,
+.schedule-days-scrollable {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
   min-width: max-content;
 }
 

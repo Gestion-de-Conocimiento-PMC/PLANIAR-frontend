@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useIsMobile } from '../ui/use-mobile'
 import { Circle, ChevronLeft, ChevronRight, Edit } from 'lucide-react'
 import { Button } from '../ui/button'
 import { ScheduleHeader } from '../Schedule/Header'
@@ -50,6 +51,8 @@ export function Schedule({
 
   const weekDates = getWeekDates(currentWeekStart)
 
+  const isMobile = useIsMobile()
+
   const goToNextWeek = () => {
     const nextMonday = new Date(currentWeekStart)
     nextMonday.setDate(currentWeekStart.getDate() + 7)
@@ -78,7 +81,7 @@ export function Schedule({
       <ScheduleHeader />
 
       {/* Controls */}
-      <div className="flex justify-between items-center gap-2">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
         <div className="flex gap-2">
           <Button onClick={goToPrevWeek} className="border border-gray-300 hover:bg-gray-100">
             <ChevronLeft /> Prev Week
@@ -88,23 +91,23 @@ export function Schedule({
           </Button>
         </div>
 
+        {/* Right-side controls: Manage (desktop) + Today (always, aligned right) */}
         <div className="flex items-center gap-2">
           <Button
             onClick={goToCurrentWeek}
-            className="gap-2 bg-[#7C3AED] hover:bg-[#6D28D9] text-white border-0"
+            className="gap-2 bg-[#7C3AED] hover:bg-[#6D28D9] text-white border-0 px-4 py-2"
           >
             <Circle className="w-4 h-4" />
             Today
           </Button>
 
-          {/* Manage Classes - opens EditClassesDialog via prop */}
           <Button
             onClick={() => onEditClasses?.(existingClasses ?? [], existingActivities ?? [])}
-            className="gap-2 bg-[#7B61FF] hover:bg-[#6D28D9] text-white border-0"
+            className="gap-2 bg-[#7B61FF] hover:bg-[#6D28D9] text-white border-0 px-3 py-2"
             title="Manage Classes & Activities"
           >
             <Edit className="w-4 h-4 text-white" />
-            <span className="hidden sm:inline">Manage Classes & Activities</span>
+            <span>{isMobile ? 'Manage C&A' : 'Manage Classes & Activities'}</span>
           </Button>
         </div>
       </div>
@@ -120,6 +123,7 @@ export function Schedule({
         existingClasses={existingClasses}
         existingActivities={existingActivities}
         dataRefreshKey={dataRefreshKey}
+        mobileHeightPerHour={isMobile ? 80 : undefined}
       />
 
       {/* Legend */}

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useIsMobile } from '../ui/use-mobile'
 import { Card, CardContent } from '../ui/card'
 import { ClassBlock } from './ClassBlock'
 import { TaskBlock } from './TaskBlock'
@@ -16,9 +17,11 @@ interface ScheduleGridProps {
   existingClasses?: any[]
   existingActivities?: any[]
   dataRefreshKey?: number
+  // mobile-only: allow parent to request a larger hour height for better visibility
+  mobileHeightPerHour?: number
 }
 
-export function ScheduleGrid({ weekDates, userId, onUpdateClass, onDeleteClass, onDeleteActivity, onEditClasses, existingClasses, existingActivities, dataRefreshKey }: ScheduleGridProps) {
+export function ScheduleGrid({ weekDates, userId, onUpdateClass, onDeleteClass, onDeleteActivity, onEditClasses, existingClasses, existingActivities, dataRefreshKey, mobileHeightPerHour }: ScheduleGridProps) {
   const [classes, setClasses] = useState<any[]>([])
   const [activities, setActivities] = useState<any[]>([])
   const [selectedClass, setSelectedClass] = useState<any>(null)
@@ -31,7 +34,15 @@ export function ScheduleGrid({ weekDates, userId, onUpdateClass, onDeleteClass, 
   const hours = Array.from({ length: 24 }, (_, i) => i)
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
   const DAYS_ORDER = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday']
-  const heightPerHour = 60
+  // Allow mobile override for height per hour to make blocks larger on mobile
+  const heightPerHour = mobileHeightPerHour ?? 60
+
+  const isMobile = useIsMobile()
+  const visibleCount = isMobile ? 3 : weekDates.length
+
+  // Refs to sync horizontal scroll between headers and days so the time column can remain outside
+  const headersRef = useRef<HTMLDivElement>(null)
+  const daysRef = useRef<HTMLDivElement>(null)
 
   const parseTime = (timeStr: string) => {
     const [h, m] = timeStr.split(':').map(Number)
@@ -61,6 +72,21 @@ export function ScheduleGrid({ weekDates, userId, onUpdateClass, onDeleteClass, 
     return () => clearInterval(interval)
   }, [])
 
+  // Sync horizontal scrolling between header row and days container so the time column remains fixed
+  useEffect(() => {
+    const h = headersRef.current
+    const d = daysRef.current
+    if (!h || !d) return
+    const onH = () => { if (d) d.scrollLeft = h.scrollLeft }
+    const onD = () => { if (h) h.scrollLeft = d.scrollLeft }
+    h.addEventListener('scroll', onH, { passive: true })
+    d.addEventListener('scroll', onD, { passive: true })
+    return () => {
+      h.removeEventListener('scroll', onH)
+      d.removeEventListener('scroll', onD)
+    }
+  }, [weekDates])
+
   // Fetch clases y actividades por fecha
   useEffect(() => {
     // If running in local/mock mode (no backend userId), use provided existing data.
@@ -69,11 +95,14 @@ export function ScheduleGrid({ weekDates, userId, onUpdateClass, onDeleteClass, 
       if (existingActivities) setActivities(existingActivities)
       setLoading(false)
       // Scroll to today
-      if (scrollContainerRef.current) {
+      if (daysRef.current) {
         const todayIndex = weekDates.findIndex(d => isToday(d))
         if (todayIndex >= 0) {
-          const cardWidth = 320
-          scrollContainerRef.current.scrollTo({ left: cardWidth * todayIndex, behavior: 'smooth' })
+          // Try to compute day width from DOM so scrolling matches actual widths.
+          const firstDay = daysRef.current.querySelector('.schedule-day-cell') as HTMLElement | null
+          const dayWidth = firstDay ? firstDay.clientWidth : 320
+          const offsetIndex = Math.max(0, todayIndex - Math.floor(visibleCount / 2))
+          daysRef.current.scrollTo({ left: dayWidth * offsetIndex, behavior: 'smooth' })
         }
       }
       return
@@ -112,11 +141,13 @@ export function ScheduleGrid({ weekDates, userId, onUpdateClass, onDeleteClass, 
       setLoading(false)
 
       // Scroll al día actual
-      if (scrollContainerRef.current) {
+      if (daysRef.current) {
         const todayIndex = weekDates.findIndex(d => isToday(d))
         if (todayIndex >= 0) {
-          const cardWidth = 320 // ajustar según ancho real del día
-          scrollContainerRef.current.scrollTo({ left: cardWidth * todayIndex, behavior: 'smooth' })
+          const firstDay = daysRef.current.querySelector('.schedule-day-cell') as HTMLElement | null
+          const dayWidth = firstDay ? firstDay.clientWidth : 320
+          const offsetIndex = Math.max(0, todayIndex - Math.floor(visibleCount / 2))
+          daysRef.current.scrollTo({ left: dayWidth * offsetIndex, behavior: 'smooth' })
         }
       }
     }
@@ -326,13 +357,17 @@ export function ScheduleGrid({ weekDates, userId, onUpdateClass, onDeleteClass, 
                   <div className="schedule-header-corner">
                     <p className="text-xs font-semibold text-muted-foreground">Time</p>
                   </div>
-                  <div className="schedule-headers-grid flex w-full">
-                    {weekDates.map((date, idx) => (
-                      <div key={idx} className={`schedule-single-day-header text-center ${isToday(date) ? 'schedule-today-header' : ''}`} style={{ flex:'1 1 0', minWidth:0 }}>
+
+                  {/* Horizontally scrollable header row (synced with days) */}
+                  <div ref={headersRef} className="schedule-headers-grid schedule-headers-scrollable flex w-full">
+                    {weekDates.map((date, idx) => {
+                      const dayStyle = isMobile ? { flex: `0 0 ${100/visibleCount}%`, minWidth: `${100/visibleCount}%` } : { flex: '1 1 0', minWidth: 0 }
+                      return (
+                      <div key={idx} className={`schedule-single-day-header text-center ${isToday(date) ? 'schedule-today-header' : ''}`} style={dayStyle}>
                         <p className="text-sm font-semibold">{dayNames[date.getDay()]}</p>
                         <p className="text-xs mt-1">{date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
                       </div>
-                    ))}
+                    )})}
                   </div>
                 </div>
 
@@ -345,44 +380,48 @@ export function ScheduleGrid({ weekDates, userId, onUpdateClass, onDeleteClass, 
                     ))}
                   </div>
 
-                  <div className="schedule-days-container flex w-full">
-                    {weekDates.map((date, idx) => {
-                      const items = getItemsForDay(date)
-                      const isTodayDate = isToday(date)
-                      return (
-                        <div key={idx} className={`schedule-day-cell relative ${isTodayDate ? 'schedule-today-cell' : ''}`} style={{ flex:'1 1 0', minWidth:0 }}>
-                          {hours.map(hour => <div key={hour} className="schedule-hour-grid-line" style={{height:`${heightPerHour}px`}} />)}
-                          {items.map((item, idy) => {
-                            const topPosition = item.startHour * heightPerHour
-                            return (
-                              <div key={idy} className="absolute" style={{ top:`${topPosition}px`, left:'4px', right:'4px', zIndex: item.itemType === 'class' ? 15 : 10 }}>
-                                {(item.itemType === 'class' || item.itemType === 'activity') ?
-                                  <ClassBlock
-                                    classData={item}
-                                    startHour={item.startHour}
-                                    duration={item.duration}
-                                    heightPerHour={heightPerHour}
-                                    onClick={() => handleClassClick(item)}
-                                  /> :
-                                  <TaskBlock 
-                                    taskData={item} 
-                                    startHour={item.startHour} 
-                                    duration={item.duration} 
-                                    heightPerHour={heightPerHour} 
-                                    onClick={() => handleTaskClick(item)}
-                                  />}
+                  {/* Days are horizontally scrollable in their own container; the time column stays outside so it remains visible */}
+                  <div ref={daysRef} className="schedule-days-scrollable w-full">
+                    <div className="schedule-days-container flex">
+                      {weekDates.map((date, idx) => {
+                        const items = getItemsForDay(date)
+                        const isTodayDate = isToday(date)
+                        const dayCellStyle = isMobile ? { flex: `0 0 ${100/visibleCount}%`, minWidth: `${100/visibleCount}%` } : { flex: '1 1 0', minWidth: 0 }
+                        return (
+                          <div key={idx} className={`schedule-day-cell relative ${isTodayDate ? 'schedule-today-cell' : ''}`} style={dayCellStyle}>
+                            {hours.map(hour => <div key={hour} className="schedule-hour-grid-line" style={{height:`${heightPerHour}px`}} />)}
+                            {items.map((item, idy) => {
+                              const topPosition = item.startHour * heightPerHour
+                              return (
+                                <div key={idy} className="absolute" style={{ top:`${topPosition}px`, left:'4px', right:'4px', zIndex: item.itemType === 'class' ? 15 : 10 }}>
+                                  {(item.itemType === 'class' || item.itemType === 'activity') ?
+                                    <ClassBlock
+                                      classData={item}
+                                      startHour={item.startHour}
+                                      duration={item.duration}
+                                      heightPerHour={heightPerHour}
+                                      onClick={() => handleClassClick(item)}
+                                    /> :
+                                    <TaskBlock 
+                                      taskData={item} 
+                                      startHour={item.startHour} 
+                                      duration={item.duration} 
+                                      heightPerHour={heightPerHour} 
+                                      onClick={() => handleTaskClick(item)}
+                                    />}
+                                </div>
+                              )
+                            })}
+                            {isTodayDate && (
+                              <div className="schedule-now-indicator" style={{ top:`${nowLinePosition}px` }}>
+                                <div className="schedule-now-label">Ahora — {currentTime}</div>
+                                <div className="schedule-now-bar"></div>
                               </div>
-                            )
-                          })}
-                          {isTodayDate && (
-                            <div className="schedule-now-indicator" style={{ top:`${nowLinePosition}px` }}>
-                              <div className="schedule-now-label">Ahora — {currentTime}</div>
-                              <div className="schedule-now-bar"></div>
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })}
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
                   </div>
                 </div>
               </div>

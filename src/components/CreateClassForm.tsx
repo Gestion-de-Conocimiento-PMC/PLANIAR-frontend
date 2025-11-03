@@ -480,9 +480,9 @@ export function CreateClassForm({ onSubmit, onBack, userId, initialData, mode, o
               <div className="space-y-3">
                 <Label>Schedule for Each Day</Label>
 
-                {/* If any "same" option is active we hide the detailed per-day inputs and
-                    show a compact summary — values have already been applied to daySchedule */}
-                {(sameProfessorActive || sameRoomActive || sameTimeActive) ? (
+                {/* If ALL "same" options are active we show the compact per-day summary (pick days only).
+                    Otherwise show the detailed per-day inputs but disable only the fields that are marked as "same". */}
+                {(sameProfessorActive && sameRoomActive && sameTimeActive) ? (
                   <div className="space-y-2 border rounded-lg p-4 bg-muted/30">
                     <p className="text-sm text-muted-foreground">Compact view: same settings are active — pick days only. Applied values shown below.</p>
                     <div className="mt-2 grid grid-cols-1 gap-2">
@@ -494,9 +494,9 @@ export function CreateClassForm({ onSubmit, onBack, userId, initialData, mode, o
                             <div className="flex items-center gap-3">
                               <Badge variant="secondary" className="bg-[#7B61FF] text-white">{day?.label}</Badge>
                               <div className="text-sm text-muted-foreground">
-                                { (info.start || info.end) ? `${info.start || ''}${info.start && info.end ? ' - ' : ''}${info.end || ''}` : (sameTimeActive ? `${globalStart || ''}${globalStart && globalEnd ? ' - ' : ''}${globalEnd || ''}` : '') }
-                                { (sameProfessorActive || info.professor) && <div>Prof: {info.professor || globalProfessor}</div> }
-                                { (sameRoomActive || info.room) && <div>Room: {info.room || globalRoom}</div> }
+                                { (info.start || info.end) ? `${info.start || ''}${info.start && info.end ? ' - ' : ''}${info.end || ''}` : `${globalStart || ''}${globalStart && globalEnd ? ' - ' : ''}${globalEnd || ''}` }
+                                <div>Prof: {info.professor || globalProfessor}</div>
+                                <div>Room: {info.room || globalRoom}</div>
                               </div>
                             </div>
                           </div>
@@ -508,6 +508,7 @@ export function CreateClassForm({ onSubmit, onBack, userId, initialData, mode, o
                   <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
                     {selectedDays.map((dayId) => {
                       const day = DAYS_OF_WEEK.find(d => d.id === dayId)
+                      const info = daySchedule[dayId] || { start: '', end: '', room: '', professor: '' }
                       return (
                         <div key={dayId} className="space-y-3 pb-3 border-b last:border-b-0 last:pb-0">
                           <div className="flex items-center gap-2">
@@ -523,8 +524,9 @@ export function CreateClassForm({ onSubmit, onBack, userId, initialData, mode, o
                               <Input
                                 type="time"
                                 placeholder="Start"
-                                value={daySchedule[dayId]?.start || ''}
-                                onChange={(e) => handleScheduleChange(dayId, 'start', e.target.value)}
+                                value={sameTimeActive ? (info.start || globalStart) : (info.start || '')}
+                                onChange={(e) => !sameTimeActive && handleScheduleChange(dayId, 'start', e.target.value)}
+                                disabled={sameTimeActive}
                               />
                             </div>
                             <div className="space-y-1">
@@ -532,8 +534,9 @@ export function CreateClassForm({ onSubmit, onBack, userId, initialData, mode, o
                               <Input
                                 type="time"
                                 placeholder="End"
-                                value={daySchedule[dayId]?.end || ''}
-                                onChange={(e) => handleScheduleChange(dayId, 'end', e.target.value)}
+                                value={sameTimeActive ? (info.end || globalEnd) : (info.end || '')}
+                                onChange={(e) => !sameTimeActive && handleScheduleChange(dayId, 'end', e.target.value)}
+                                disabled={sameTimeActive}
                               />
                             </div>
                           </div>
@@ -544,16 +547,18 @@ export function CreateClassForm({ onSubmit, onBack, userId, initialData, mode, o
                               <Label className="text-xs text-muted-foreground">Room</Label>
                               <Input
                                 placeholder="e.g., Room 305"
-                                value={daySchedule[dayId]?.room || ''}
-                                onChange={(e) => handleScheduleChange(dayId, 'room', e.target.value)}
+                                value={sameRoomActive ? (info.room || globalRoom) : (info.room || '')}
+                                onChange={(e) => !sameRoomActive && handleScheduleChange(dayId, 'room', e.target.value)}
+                                disabled={sameRoomActive}
                               />
                             </div>
                             <div className="space-y-1">
                               <Label className="text-xs text-muted-foreground">Professor</Label>
                               <Input
                                 placeholder="e.g., Dr. Smith"
-                                value={daySchedule[dayId]?.professor || ''}
-                                onChange={(e) => handleScheduleChange(dayId, 'professor', e.target.value)}
+                                value={sameProfessorActive ? (info.professor || globalProfessor) : (info.professor || '')}
+                                onChange={(e) => !sameProfessorActive && handleScheduleChange(dayId, 'professor', e.target.value)}
+                                disabled={sameProfessorActive}
                               />
                             </div>
                           </div>
