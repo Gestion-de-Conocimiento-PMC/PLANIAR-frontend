@@ -55,10 +55,24 @@ export function TaskManager({ userId, onUpdateTask, onDeleteTask, dataRefreshKey
     workingDate: (task as any).workingDate ?? (task as any).working_date ?? null,
     startTime: (task as any).startTime ?? (task as any).start_time ?? null,
     endTime: (task as any).endTime ?? (task as any).end_time ?? null,
-    priority: (task.priority || 'Low') as 'High' | 'Medium' | 'Low',
+    // Normalize priority and type casing so filters work regardless of backend casing
+    priority: (() => {
+      const raw = task.priority ?? task.priority
+      if (!raw) return 'Low'
+      const s = String(raw).trim()
+      return (s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()) as 'High' | 'Medium' | 'Low'
+    })(),
     estimatedTime: task.estimatedTime || 0,
     description: task.description || '',
-    type: task.type || 'activity',
+    // Normalize type to one of the allowed values: Homework, Project, Exam
+    type: (() => {
+      const raw = task.type ?? task.type
+      const allowed = ['Homework', 'Project', 'Exam']
+      if (!raw) return 'Homework'
+      const s = String(raw).trim()
+      const normalized = s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
+      return allowed.includes(normalized) ? normalized : 'Homework'
+    })(),
     status: (task.state || 'Pending') as 'Pending' | 'In Progress' | 'Completed',
   })
 
@@ -301,8 +315,9 @@ export function TaskManager({ userId, onUpdateTask, onDeleteTask, dataRefreshKey
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="homework">Homework</SelectItem>
-                  <SelectItem value="activity">Activity</SelectItem>
+                  <SelectItem value="Homework">Homework</SelectItem>
+                  <SelectItem value="Project">Project</SelectItem>
+                  <SelectItem value="Exam">Exam</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -312,9 +327,9 @@ export function TaskManager({ userId, onUpdateTask, onDeleteTask, dataRefreshKey
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Priorities</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="High">High</SelectItem>
+                  <SelectItem value="Medium">Medium</SelectItem>
+                  <SelectItem value="Low">Low</SelectItem>
                 </SelectContent>
               </Select>
 
