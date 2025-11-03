@@ -137,7 +137,16 @@ export function TaskEditDialog({ task, onUpdateTask, children, onRefresh }: Task
 
   const formatDate = (dateString: string) => {
     if (!dateString) return ''
-    const date = new Date(dateString)
+    // Prefer constructing a local Date from YYYY-MM-DD to avoid timezone shifts
+    const s = String(dateString)
+    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    let date: Date
+    if (m) {
+      date = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+    } else {
+      date = new Date(s)
+    }
+    if (isNaN(date.getTime())) return s
     return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
   }
 
@@ -272,7 +281,13 @@ export function TaskEditDialog({ task, onUpdateTask, children, onRefresh }: Task
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="text-xs text-muted-foreground">Work session</div>
-                    <div className="text-sm">{workingDate ? new Date(workingDate).toLocaleDateString() : 'Not set'}</div>
+                    <div className="text-sm">{workingDate ? ((): string => {
+                        const s = String(workingDate)
+                        const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+                        if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).toLocaleDateString()
+                        const d = new Date(s)
+                        return isNaN(d.getTime()) ? s : d.toLocaleDateString()
+                      })() : 'Not set'}</div>
                     <div className="text-sm">{(startTime || endTime) ? `${startTime || 'TBD'} - ${endTime || 'TBD'}` : 'Not set'}</div>
                   </div>
                   <div>

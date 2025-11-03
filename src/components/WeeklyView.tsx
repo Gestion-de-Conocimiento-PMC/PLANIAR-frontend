@@ -180,6 +180,22 @@ export function WeeklyView({ userId }: WeeklyViewProps) {
     return String(v)
   }
 
+  // Create a local-date formatted string safely from a YYYY-MM-DD or other ISO-ish input
+  const toLocalDateString = (isoLike: string | null | undefined) => {
+    if (!isoLike) return ''
+    const s = String(isoLike)
+    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    if (m) {
+      const y = Number(m[1])
+      const mo = Number(m[2]) - 1
+      const d = Number(m[3])
+      return new Date(y, mo, d).toLocaleDateString()
+    }
+    const parsed = new Date(s)
+    if (!isNaN(parsed.getTime())) return parsed.toLocaleDateString()
+    return s
+  }
+
   const parseTimeVal = (v: any) => {
     if (!v) return ''
     if (typeof v === 'string') {
@@ -426,7 +442,7 @@ export function WeeklyView({ userId }: WeeklyViewProps) {
                                   <div className="mt-1 flex items-center gap-3">
                                     {/* Show due date from either `date` or `dueDate` */}
                                     {(((item as any).date) || ((item as any).dueDate)) && (
-                                      <div className="text-xs text-muted-foreground">Due: {new Date(parseDateVal((item as any).dueDate || (item as any).date)).toLocaleDateString()}</div>
+                                      <div className="text-xs text-muted-foreground">Due: {toLocalDateString(parseDateVal((item as any).dueDate || (item as any).date))}</div>
                                     )}
                                     {((item as any).startTime || (item as any).start_time) && ((item as any).endTime || (item as any).end_time) && (
                                       <div className="text-xs font-medium" style={{ color: '#1E90FF' }}>

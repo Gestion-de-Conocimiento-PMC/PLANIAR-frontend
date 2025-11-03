@@ -199,7 +199,11 @@ export function TaskManager({ userId, onUpdateTask, onDeleteTask, dataRefreshKey
   const formatDate = (dateString: string | any) => {
     const ds = parseDateVal(dateString)
     if (!ds) return ''
-    const date = new Date(ds)
+    // Construct a local date from YYYY-MM-DD to avoid timezone shifts
+    const m = String(ds).match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    let date: Date
+    if (m) date = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+    else date = new Date(String(ds))
     const today = new Date()
     const tomorrow = new Date(today)
     tomorrow.setDate(today.getDate() + 1)
@@ -230,7 +234,18 @@ export function TaskManager({ userId, onUpdateTask, onDeleteTask, dataRefreshKey
     })
     .sort((a, b) => {
       switch (sortBy) {
-        case 'dueDate': return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
+        case 'dueDate': {
+              const dsA = parseDateVal(a.dueDate)
+              const dsB = parseDateVal(b.dueDate)
+              const toTs = (s: any) => {
+                if (!s) return 0
+                const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})$/)
+                if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getTime()
+                const d = new Date(String(s))
+                return isNaN(d.getTime()) ? 0 : d.getTime()
+              }
+              return toTs(dsA) - toTs(dsB)
+            }
         case 'priority':
           const order = { High: 3, Medium: 2, Low: 1 }
           return order[b.priority] - order[a.priority]
