@@ -284,8 +284,7 @@ export function CreateClassForm({ onSubmit, onBack, userId, initialData, mode, o
 
           <div className="space-y-4">
             <div>
-              <h3 className="text-lg font-medium">upload your schedule ics file</h3>
-              <p className="text-sm text-muted-foreground">Supports only .ics files</p>
+              <h3 className="text-lg font-medium">Upload your schedule .ics file</h3>
             </div>
 
             <AIUploadView

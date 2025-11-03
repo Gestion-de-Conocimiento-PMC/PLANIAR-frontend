@@ -160,12 +160,11 @@ export function CreateActivityForm({ onSubmit, onBack, userId, initialData, mode
 
         {!isEditMode && (
           <TabsContent value="ai" className="mt-4">
-            <AIUploadView
-              onAnalysisComplete={handleAIAnalysis}
-              analysisType="activity"
-              description="Upload your activity schedule or details"
-            />
-          </TabsContent>
+              <div className="p-6 rounded-lg border border-dashed border-muted-foreground/40 text-center">
+                <p className="text-lg font-medium">AI assistance — coming soon...</p>
+                <p className="text-sm text-muted-foreground mt-2">Upload and AI parsing for activities will be available soon.</p>
+              </div>
+            </TabsContent>
         )}
 
         <TabsContent value="manual" className="mt-4">

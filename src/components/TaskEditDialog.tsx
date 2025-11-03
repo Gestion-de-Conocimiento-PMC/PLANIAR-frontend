@@ -43,6 +43,7 @@ export function TaskEditDialog({ task, onUpdateTask, children, onRefresh }: Task
   const [workingDate, setWorkingDate] = useState('')
   const [startTime, setStartTime] = useState('')
   const [endTime, setEndTime] = useState('')
+  const [dueTime, setDueTime] = useState('')
 
   useEffect(() => {
     if (task) {
@@ -85,6 +86,9 @@ export function TaskEditDialog({ task, onUpdateTask, children, onRefresh }: Task
       setWorkingDate(parseDateVal((task as any).workingDate ?? (task as any).working_date))
       setStartTime(parseTimeVal((task as any).startTime ?? (task as any).start_time))
       setEndTime(parseTimeVal((task as any).endTime ?? (task as any).end_time))
+      // dueTime may be present as dueTime or embedded in dueDate
+      const parsedDueTime = parseTimeVal((task as any).dueTime ?? (task as any).due_time ?? null)
+      if (parsedDueTime) setDueTime(parsedDueTime)
       // hide advanced by default when opening edit dialog
       setShowAdvanced(false)
     }
@@ -107,6 +111,7 @@ export function TaskEditDialog({ task, onUpdateTask, children, onRefresh }: Task
         type: "Homework",
         // send backend field dueDate
         dueDate: formData.date,
+        dueTime: dueTime || null,
         priority: formData.priority,
         estimatedTime: formData.estimatedTime,
         description: formData.description,
@@ -223,17 +228,24 @@ export function TaskEditDialog({ task, onUpdateTask, children, onRefresh }: Task
             <CardContent className="pt-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="dueDate" className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4" /> Due Date *
-                  </Label>
-                  <Input
-                    id="dueDate"
-                    type="date"
-                    value={formData.date}
-                    onChange={e => handleInputChange('date', e.target.value)}
-                    required
-                  />
-                  {formData.date && <p className="text-sm text-muted-foreground">{formatDate(formData.date)}</p>}
+                  <Label className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4" /> Due Date & Time *
+                    </Label>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div>
+                        <Input
+                          id="dueDate"
+                          type="date"
+                          value={formData.date}
+                          onChange={e => handleInputChange('date', e.target.value)}
+                          required
+                        />
+                        {formData.date && <p className="text-sm text-muted-foreground">{formatDate(formData.date)}</p>}
+                      </div>
+                      <div className="md:col-span-2">
+                        <Input type="time" value={dueTime} onChange={e => setDueTime(e.target.value)} />
+                      </div>
+                    </div>
                 </div>
 
                 <div className="space-y-2">

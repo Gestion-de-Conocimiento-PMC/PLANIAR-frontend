@@ -27,6 +27,7 @@ export function CreateTaskFormImproved({ onSubmit, onBack, userId, initialValues
   const [classId, setClassId] = useState<number | null>(null)
   const [priority, setPriority] = useState<'High' | 'Medium' | 'Low'>('Medium')
   const [date, setDate] = useState('')
+  const [dueTime, setDueTime] = useState('')
   const [workDate, setWorkDate] = useState('')
   const [estimatedTime, setEstimatedTime] = useState('')
   const [timeUnit, setTimeUnit] = useState('minutes')
@@ -39,7 +40,8 @@ export function CreateTaskFormImproved({ onSubmit, onBack, userId, initialValues
   const [classes, setClasses] = useState<ClassData[]>([])
   // When editing an existing task we keep advanced fields locked until user opts-in
   const isEditMode = !!initialValues
-  const [showAdvanced, setShowAdvanced] = useState(!isEditMode)
+  // Advanced panel should be hidden by default for both create and edit; user can opt-in
+  const [showAdvanced, setShowAdvanced] = useState(false)
 
   // 🔹 Cargar clases del usuario
   useEffect(() => {
@@ -67,7 +69,16 @@ export function CreateTaskFormImproved({ onSubmit, onBack, userId, initialValues
     setClassId(iv.classId ?? iv.class?.id ?? null)
     setPriority(iv.priority || 'Medium')
     // support legacy 'date' or 'dueDate'
-    setDate(iv.date ? String(iv.date).split('T')[0] : (iv.dueDate ? String(iv.dueDate).split('T')[0] : ''))
+    // dueDate and dueTime support
+    if (iv.date) setDate(String(iv.date).split('T')[0])
+    else if (iv.dueDate) setDate(String(iv.dueDate).split('T')[0])
+    else setDate('')
+    // dueTime may be provided as iv.dueTime or embedded in dueDate
+    if (iv.dueTime) setDueTime(String(iv.dueTime).split(':').slice(0,2).join(':'))
+    else if (iv.dueDate && String(iv.dueDate).includes('T')) {
+      const parts = String(iv.dueDate).split('T')
+      if (parts[1]) setDueTime(parts[1].split(':').slice(0,2).join(':'))
+    }
     setWorkDate(iv.workingDate ? String(iv.workingDate).split('T')[0] : (iv.workDate ? String(iv.workDate).split('T')[0] : ''))
     setWorkStart(iv.startTime || '')
     setWorkEnd(iv.endTime || '')
@@ -84,10 +95,13 @@ export function CreateTaskFormImproved({ onSubmit, onBack, userId, initialValues
     const newErrors: Record<string, string> = {}
     if (!title.trim()) newErrors.title = 'Title is required'
   if (!date) newErrors.date = 'Date is required'
-  // Only require workingDay/start/end when creating or when advanced editing is enabled
-  if ((!isEditMode || showAdvanced) && !workDate) newErrors.workDate = 'Select a day to work on this task'
-  if ((!isEditMode || showAdvanced) && !workStart) newErrors.workStart = 'Start time is required'
-  if ((!isEditMode || showAdvanced) && !workEnd) newErrors.workEnd = 'End time is required'
+  if (!dueTime) newErrors.dueTime = 'Due time is required'
+  // Only require workingDay/start/end when advanced editing is enabled
+  if (showAdvanced) {
+    if (!workDate) newErrors.workDate = 'Select a day to work on this task'
+    if (!workStart) newErrors.workStart = 'Start time is required'
+    if (!workEnd) newErrors.workEnd = 'End time is required'
+  }
     // Ensure end time is after start time when both provided
     if (workStart && workEnd) {
       const [sh, sm] = workStart.split(':').map(x => parseInt(x, 10))
@@ -107,8 +121,8 @@ export function CreateTaskFormImproved({ onSubmit, onBack, userId, initialValues
     setLoading(true)
 
     try {
-      const dateISO = date ? new Date(date).toISOString().split('T')[0] : null
-      const workDateISO = workDate ? new Date(workDate).toISOString().split('T')[0] : null
+  const dateISO = date ? new Date(date).toISOString().split('T')[0] : null
+  const workDateISO = workDate ? new Date(workDate).toISOString().split('T')[0] : null
       const timeInMinutes = timeUnit === 'hours' ? parseInt(estimatedTime) * 60 : parseInt(estimatedTime)
 
       // Normalize times to HH:MM (no seconds)
@@ -124,6 +138,8 @@ export function CreateTaskFormImproved({ onSubmit, onBack, userId, initialValues
         classId,
         // use backend field name 'dueDate'
         dueDate: dateISO,
+        // dueTime is required: normalized HH:MM
+        dueTime: normalizeTime(dueTime) || null,
         // backend-friendly fields for scheduling the work session
         workingDate: workDateISO,
         startTime: normalizeTime(workStart) || null,
@@ -145,6 +161,7 @@ export function CreateTaskFormImproved({ onSubmit, onBack, userId, initialValues
         setClassId(null)
         setPriority('Medium')
         setDate('')
+        setDueTime('')
         setWorkDate('')
         setWorkStart('')
         setWorkEnd('')
@@ -199,13 +216,23 @@ export function CreateTaskFormImproved({ onSubmit, onBack, userId, initialValues
             disabled={classes.length === 0}
           >
             <SelectTrigger>
-              <SelectValue
-                placeholder={
-                  classes.length === 0
-                    ? 'No classes available'
-                    : 'Select a class'
-                }
-              />
+              {/* show a small color circle for the selected class and the class name */}
+              <div className="flex items-center gap-2">
+                {(() => {
+                  const sel = classes.find(c => c.id === classId)
+                  if (sel && sel.color) {
+                    return <div className="w-3 h-3 rounded-full" style={{ backgroundColor: sel.color }} />
+                  }
+                  return null
+                })()}
+                <SelectValue
+                  placeholder={
+                    classes.length === 0
+                      ? 'No classes available'
+                      : 'Select a class'
+                  }
+                />
+              </div>
             </SelectTrigger>
             <SelectContent>
               {classes.length === 0 ? (
@@ -213,7 +240,13 @@ export function CreateTaskFormImproved({ onSubmit, onBack, userId, initialValues
               ) : (
                 classes.map((cls) => (
                   <SelectItem key={cls.id} value={cls.id.toString()}>
-                    {cls.title}
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: cls.color }}
+                      />
+                      {cls.title}
+                    </div>
                   </SelectItem>
                 ))
               )}
@@ -255,19 +288,33 @@ export function CreateTaskFormImproved({ onSubmit, onBack, userId, initialValues
           </div>
         </div>
 
-        {/* Due Date */}
+        {/* Due Date + Time */}
         <div className="space-y-2">
-          <Label htmlFor="date">
-            Due Date <span className="text-destructive">*</span>
+          <Label>
+            Due Date & Time <span className="text-destructive">*</span>
           </Label>
-          <Input
-            id="date"
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className={errors.date ? 'border-destructive' : ''}
-          />
-          {errors.date && <p className="text-sm text-destructive">{errors.date}</p>}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <Input
+                id="date"
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className={errors.date ? 'border-destructive' : ''}
+              />
+              {errors.date && <p className="text-sm text-destructive">{errors.date}</p>}
+            </div>
+            <div className="md:col-span-2">
+              <Input
+                id="dueTime"
+                type="time"
+                value={dueTime}
+                onChange={(e) => setDueTime(e.target.value)}
+                className={errors.dueTime ? 'border-destructive' : ''}
+              />
+              {errors.dueTime && <p className="text-sm text-destructive">{errors.dueTime}</p>}
+            </div>
+          </div>
         </div>
 
         {/* Task Type */}
@@ -372,11 +419,9 @@ export function CreateTaskFormImproved({ onSubmit, onBack, userId, initialValues
           <Button variant="outline" onClick={onBack}>
             Cancel
           </Button>
-          {isEditMode && (
-            <Button variant="ghost" onClick={() => setShowAdvanced(s => !s)}>
-              {showAdvanced ? 'Hide advanced' : 'Advanced'}
-            </Button>
-          )}
+          <Button variant="ghost" onClick={() => setShowAdvanced(s => !s)}>
+            {showAdvanced ? 'Hide advanced' : 'Advanced'}
+          </Button>
           <Button
             onClick={handleSubmit}
             className="bg-[#7B61FF] hover:bg-[#6B51EF]"

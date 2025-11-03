@@ -13,8 +13,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { useState } from 'react'
 
 interface UserAvatarProps {
-  // Accept flexible user shape returned by backend: may contain `name`, `username`, `email`, etc.
-  user: { name?: string; username?: string; email?: string } | null
+  // Accept flexible user shape returned by backend: may contain `name`, `username`, `email`, `registrationDate`, `registeredAt`, etc.
+  user: { name?: string; username?: string; email?: string; registrationDate?: string; registeredAt?: string } | null
   onLogout: () => void
   onEditClasses: () => void
 }
@@ -106,7 +106,19 @@ export function UserAvatar({ user, onLogout, onEditClasses }: UserAvatarProps) {
             </div>
             <div className="space-y-2">
               <label className="text-sm">Member since</label>
-              <p className="text-base">October 2025</p>
+              <p className="text-base">
+                {(() => {
+                  const rd = user?.registrationDate || user?.registeredAt || null
+                  if (!rd) return '—'
+                  const s = String(rd)
+                  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/)
+                  let d: Date
+                  if (m) d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+                  else d = new Date(s)
+                  if (isNaN(d.getTime())) return s
+                  return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+                })()}
+              </p>
             </div>
           </div>
         </DialogContent>

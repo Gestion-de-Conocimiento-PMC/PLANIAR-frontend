@@ -272,7 +272,7 @@ export function WeeklyView({ userId }: WeeklyViewProps) {
       </div>
 
       {/* Weekly Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-6 flex items-center justify-between">
             <div>
@@ -313,7 +313,7 @@ export function WeeklyView({ userId }: WeeklyViewProps) {
 
       {/* Week Navigation */}
       <Card className="p-4">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-4">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-4">
           <div className="flex items-center justify-center gap-4">
             <Button variant="outline" size="icon" onClick={() => setCurrentWeek(currentWeek - 1)}>
               <ChevronLeft className="w-4 h-4" />
@@ -325,7 +325,7 @@ export function WeeklyView({ userId }: WeeklyViewProps) {
               <ChevronRight className="w-4 h-4" />
             </Button>
           </div>
-          <div className="flex items-center gap-3 w-full lg:w-auto">
+          <div className="flex flex-col lg:flex-row items-center gap-3 w-full lg:w-auto">
             <Button
               onClick={() => setCurrentWeek(0)}
               className="gap-2 bg-[#7C3AED] hover:bg-[#6D28D9] text-white border-0 w-full lg:w-auto"
@@ -335,28 +335,26 @@ export function WeeklyView({ userId }: WeeklyViewProps) {
             </Button>
 
             {/* Refresh my plan button with dynamic counter (persisted monthly). Admins have unlimited refreshes. */}
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                className={`gap-2 ${isRefreshAvailable ? 'bg-[#7C3AED] hover:bg-[#6D28D9] text-white border-0' : 'border-[#7B61FF] text-[#7B61FF] bg-white'}`}
-                onClick={() => {
-                  if (userRole !== 'user') {
-                    window.dispatchEvent(new CustomEvent('planiar:notify', { detail: { message: 'Unlimited refreshes for your role' } }))
-                    return
-                  }
-                  if (refreshCount <= 0) {
-                    window.dispatchEvent(new CustomEvent('planiar:notify', { detail: { message: 'No refreshes left for this month' } }))
-                    return
-                  }
-                  setRefreshCount(c => c - 1)
-                  window.dispatchEvent(new CustomEvent('planiar:notify', { detail: { message: 'Plan refreshed (simulated)' } }))
-                }}
-                disabled={!isRefreshAvailable}
-              >
-                <span>Refresh my plan</span>
-                <Badge className="ml-2">{userRole === 'user' ? `${refreshCount}/${maxRefreshCount}` : '∞'}</Badge>
-              </Button>
-            </div>
+            <Button
+              size="sm"
+              className={`gap-2 ${isRefreshAvailable ? 'bg-[#7C3AED] hover:bg-[#6D28D9] text-white border-0 w-full lg:w-auto' : 'border-[#7B61FF] text-[#7B61FF] bg-white w-full lg:w-auto'}`}
+              onClick={() => {
+                if (userRole !== 'user') {
+                  window.dispatchEvent(new CustomEvent('planiar:notify', { detail: { message: 'Unlimited refreshes for your role' } }))
+                  return
+                }
+                if (refreshCount <= 0) {
+                  window.dispatchEvent(new CustomEvent('planiar:notify', { detail: { message: 'No refreshes left for this month' } }))
+                  return
+                }
+                setRefreshCount(c => c - 1)
+                window.dispatchEvent(new CustomEvent('planiar:notify', { detail: { message: 'Plan refreshed (simulated)' } }))
+              }}
+              disabled={!isRefreshAvailable}
+            >
+              <span>Refresh my plan</span>
+              <Badge className="ml-2">{userRole === 'user' ? `${refreshCount}/${maxRefreshCount}` : '∞'}</Badge>
+            </Button>
           </div>
         </div>
 
@@ -439,13 +437,20 @@ export function WeeklyView({ userId }: WeeklyViewProps) {
                                   </div>
                                   {item.subject && <p className="text-xs text-muted-foreground mt-1">{item.subject}</p>}
                                   {/* Show due date and work hours */}
-                                  <div className="mt-1 flex items-center gap-3">
-                                    {/* Show due date from either `date` or `dueDate` */}
+                                  <div className="mt-1">
+                                    {/* Show due date and due time on the same line */}
                                     {(((item as any).date) || ((item as any).dueDate)) && (
-                                      <div className="text-xs text-muted-foreground">Due: {toLocalDateString(parseDateVal((item as any).dueDate || (item as any).date))}</div>
+                                      <div className="text-xs text-muted-foreground">
+                                        Due: {toLocalDateString(parseDateVal((item as any).dueDate || (item as any).date))} 
+                                        {((item as any).dueTime || (item as any).due_time) && (
+                                          <span className="ml-2"> • {parseTimeVal((item as any).dueTime ?? (item as any).due_time)}</span>
+                                        )}
+                                      </div>
                                     )}
+
+                                    {/* Start/End work times (show below the due line) */}
                                     {((item as any).startTime || (item as any).start_time) && ((item as any).endTime || (item as any).end_time) && (
-                                      <div className="text-xs font-medium" style={{ color: '#1E90FF' }}>
+                                      <div className="text-xs font-medium mt-1" style={{ color: '#1E90FF' }}>
                                         {parseTimeVal((item as any).startTime ?? (item as any).start_time)} - {parseTimeVal((item as any).endTime ?? (item as any).end_time)}
                                       </div>
                                     )}

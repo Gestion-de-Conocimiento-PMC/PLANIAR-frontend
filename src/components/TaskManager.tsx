@@ -21,6 +21,7 @@ export interface TaskForUI {
   workingDate?: string | null
   startTime?: string | null
   endTime?: string | null
+  dueTime?: string | null
   priority: 'High' | 'Medium' | 'Low'
   estimatedTime: number
   description: string
@@ -55,6 +56,7 @@ export function TaskManager({ userId, onUpdateTask, onDeleteTask, dataRefreshKey
     workingDate: (task as any).workingDate ?? (task as any).working_date ?? null,
     startTime: (task as any).startTime ?? (task as any).start_time ?? null,
     endTime: (task as any).endTime ?? (task as any).end_time ?? null,
+  dueTime: (task as any).dueTime ?? (task as any).due_time ?? null,
     // Normalize priority and type casing so filters work regardless of backend casing
     priority: (() => {
       const raw = task.priority ?? task.priority
