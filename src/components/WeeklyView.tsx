@@ -155,7 +155,10 @@ export function WeeklyView({ userId }: WeeklyViewProps) {
   }, [tasks, activities, currentWeek])
 
   const getTasksForDay = (date: Date) => {
-    const dateStr = date.toISOString().split('T')[0]
+    // Build a local YYYY-MM-DD string to avoid timezone shifts caused by toISOString()
+    const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
+      date.getDate()
+    ).padStart(2, '0')}`
     const parseDateVal = (v: any) => {
       if (!v) return null
       if (typeof v === 'string') return v.split('T')[0]
@@ -166,7 +169,8 @@ export function WeeklyView({ userId }: WeeklyViewProps) {
     }
 
     return tasks.filter(t => {
-      const raw = (t as any).workingDate ?? (t as any).date ?? (t as any).dueDate
+      // Support multiple possible field names returned by different backends
+      const raw = (t as any).workingDate ?? (t as any).working_date ?? (t as any).date ?? (t as any).dueDate ?? (t as any).due_date ?? null
       const wd = parseDateVal(raw)
       if (!wd) return false
       return wd === dateStr
@@ -199,6 +203,14 @@ export function WeeklyView({ userId }: WeeklyViewProps) {
   const parseTimeVal = (v: any) => {
     if (!v) return ''
     if (typeof v === 'string') {
+      // If value is an ISO datetime, extract time after 'T'
+      if (v.includes('T')) {
+        const timePart = v.split('T')[1]
+        if (timePart) {
+          const hhmm = timePart.split(':')
+          return hhmm.length >= 2 ? `${hhmm[0].padStart(2,'0')}:${hhmm[1].padStart(2,'0')}` : v
+        }
+      }
       const parts = v.split(':')
       return parts.length >= 2 ? `${parts[0].padStart(2,'0')}:${parts[1].padStart(2,'0')}` : v
     }

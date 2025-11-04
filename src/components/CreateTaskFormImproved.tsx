@@ -216,23 +216,14 @@ export function CreateTaskFormImproved({ onSubmit, onBack, userId, initialValues
             disabled={classes.length === 0}
           >
             <SelectTrigger>
-              {/* show a small color circle for the selected class and the class name */}
-              <div className="flex items-center gap-2">
-                {(() => {
-                  const sel = classes.find(c => c.id === classId)
-                  if (sel && sel.color) {
-                    return <div className="w-3 h-3 rounded-full" style={{ backgroundColor: sel.color }} />
-                  }
-                  return null
-                })()}
-                <SelectValue
-                  placeholder={
-                    classes.length === 0
-                      ? 'No classes available'
-                      : 'Select a class'
-                  }
-                />
-              </div>
+              {/* Let the SelectValue render the selected item's content (SelectItem includes the color dot). */}
+              <SelectValue
+                placeholder={
+                  classes.length === 0
+                    ? 'No classes available'
+                    : 'Select a class'
+                }
+              />
             </SelectTrigger>
             <SelectContent>
               {classes.length === 0 ? (
