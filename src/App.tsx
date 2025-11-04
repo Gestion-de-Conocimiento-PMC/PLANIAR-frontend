@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { APIPATH } from './lib/api'
 import { EditClassesDialog } from './components/EditClassesDialog'
 import { User, TaskActivity, ClassItem } from './types'
+import WelcomeTutorial from './components/WelcomeTutorial'
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
@@ -508,6 +509,15 @@ export default function App() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Welcome tutorial for new users (appears once per user) */}
+        {user && (
+          <WelcomeTutorial userId={user.id ?? user.email} onCreateClassClick={() => {
+            // Open the Manage dialog where user can create a class
+            setSelectedClassesForDialog(userClasses)
+            setSelectedActivitiesForDialog(userTasks)
+            setIsEditClassesOpen(true)
+          }} />
+        )}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-flex">
             <TabsTrigger value="dashboard" className="gap-2">

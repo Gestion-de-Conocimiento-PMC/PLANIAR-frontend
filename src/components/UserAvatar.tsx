@@ -13,8 +13,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { useState } from 'react'
 
 interface UserAvatarProps {
-  // Accept flexible user shape returned by backend: may contain `name`, `username`, `email`, `registrationDate`, `registeredAt`, etc.
-  user: { name?: string; username?: string; email?: string; registrationDate?: string; registeredAt?: string } | null
+  // Accept flexible user shape returned by backend: may contain `id`, `name`, `username`, `email`, `registrationDate`, `registeredAt`, etc.
+  user: { id?: string | number; name?: string; username?: string; email?: string; registrationDate?: string; registeredAt?: string } | null
   onLogout: () => void
   onEditClasses: () => void
 }
@@ -150,6 +150,24 @@ export function UserAvatar({ user, onLogout, onEditClasses }: UserAvatarProps) {
             <div className="flex items-center justify-between">
               <label className="text-sm">Time zone</label>
               <div className="text-muted-foreground text-sm">GMT-5</div>
+            </div>
+            <div className="pt-2">
+              <Button
+                onClick={() => {
+                  try {
+                    const key = `planiar:tutorialSeen:${user?.id ?? user?.email}`
+                    localStorage.removeItem(key)
+                  } catch (e) {
+                    // ignore storage errors
+                  }
+                  // Ask the tutorial component to show itself
+                  window.dispatchEvent(new Event('planiar:showTutorial'))
+                  setShowOptions(false)
+                }}
+                className="w-full bg-[#7B61FF] text-white"
+              >
+                Show Tutorial
+              </Button>
             </div>
           </div>
         </DialogContent>
