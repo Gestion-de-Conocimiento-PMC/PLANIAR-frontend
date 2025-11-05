@@ -22,37 +22,36 @@ export function WelcomeTutorial({ userId, onCreateClassClick }: WelcomeTutorialP
       title: 'Create Classes',
       text: 'Define your classes with times, professor and room. You can even import classes from your university schedule using a .ics file to save time!',
       icon: BookOpen,
-      image: 'create-class.png'
+      image: 'create-class.gif'
     },
     {
       title: 'Create Activities',
       text: 'Add activities, set reminders and link them to your classes so everything stays organized.',
       icon: CalendarPlus,
-      image: 'create-activity.png'
+      image: 'create-activity.gif'
     },
     {
       title: 'Create Tasks',
       text: 'Create task lists, set due dates and mark items as done to stay on top of your work.',
       icon: ListChecks,
-      image: 'create-task.png'
+      image: 'create-task.gif'
     },
     {
       title: 'Manage Classes & Activities',
       text: 'Edit or remove classes and activities, and view them together in your schedule.',
       icon: ClipboardCheck,
-      image: 'manage-classes.png'
+      image: 'manage-classes.gif'
     },
     {
       title: 'Manage Tasks',
       text: 'Organize your tasks, prioritize them and track progress over time.',
       icon: ListChecks,
-      image: 'manage-tasks.png'
+      image: 'manage-tasks.gif'
     },
     {
       title: 'Ready to create your first class?',
       text: 'When you are ready you can create a class and start planning your schedule.',
       icon: BookOpen,
-      image: 'welcome.png',
       final: true
     }
   ]
@@ -93,54 +92,31 @@ export function WelcomeTutorial({ userId, onCreateClassClick }: WelcomeTutorialP
 
   const SlideIcon = slides[index].icon
 
-  // Track resolved image URL and whether it actually loads. If the image file is missing
-  // the component will fall back to rendering the icon so the UI is robust when assets
-  // are not present.
-  const [resolvedImageUrl, setResolvedImageUrl] = useState<string | null>(null)
-  const [imageExists, setImageExists] = useState(false)
-
-  useEffect(() => {
-    const imgName = slides[index].image
-    if (!imgName) {
-      setResolvedImageUrl(null)
-      setImageExists(false)
-      return
-    }
-
-    try {
-      const url = new URL(`../assets/tutorial/${imgName}`, import.meta.url).toString()
-      setResolvedImageUrl(url)
-      // Preload image to confirm it exists; Image onerror will catch 404s.
-      const probe = new Image()
-      let canceled = false
-      probe.onload = () => { if (!canceled) setImageExists(true) }
-      probe.onerror = () => { if (!canceled) setImageExists(false) }
-      probe.src = url
-      return () => { canceled = true; probe.onload = null; probe.onerror = null }
-    } catch (e) {
-      setResolvedImageUrl(null)
-      setImageExists(false)
-    }
-  }, [index])
+  // Resolve image URL for the slide GIF (if provided). We assume the GIFs are placed in
+  // `src/assets/tutorial/` and included in the Vite build. Do not probe for existence;
+  // just construct the URL and render the GIF when the slide defines one.
+  const imageUrl = slides[index].image ? new URL(`../assets/tutorial/${slides[index].image}`, import.meta.url).toString() : null
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) closePermanent(); setOpen(v) }}>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
           <div className="flex items-center gap-4">
-            {resolvedImageUrl && imageExists ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={resolvedImageUrl} alt={slides[index].title} className="w-12 h-12 rounded-md object-cover" />
-            ) : (
-              // Render lucide-react icons with explicit size/color so they display even when images
-              // are not provided or fail to load.
-              <SlideIcon size={28} color="#7B61FF" />
-            )}
+            {/* Always show the slide icon in the header; the GIF (if present) will be shown
+                inside the content above the slide text so it doesn't compete with the title. */}
+            <SlideIcon size={28} color="#7B61FF" />
             <DialogTitle>{slides[index].title}</DialogTitle>
           </div>
         </DialogHeader>
 
         <div className="p-4">
+          {/* Render slide GIF/image above the text if it exists; center it and limit width */}
+          {imageUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <div className="w-full flex justify-center mb-4">
+              <img src={imageUrl} alt={slides[index].title} className="max-w-xs w-full rounded-md object-cover" />
+            </div>
+          )}
           <div className="flex-1">
             <p className="text-sm text-muted-foreground">{slides[index].text}</p>
           </div>
