@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Button } from './ui/button'
 import { X } from 'lucide-react'
 import { APIPATH } from '../lib/api'
@@ -40,6 +40,16 @@ const SurveyBanner: React.FC<SurveyBannerProps> = ({ userId }) => {
       })
       if (res.ok) {
         window.dispatchEvent(new CustomEvent('planiar:notify', { detail: { message: 'Gracias por contestar la encuesta.' } }))
+        // persist a quick marker locally to avoid re-showing immediately
+        try {
+          const today = new Date()
+          const yyyy = today.getFullYear()
+          const mm = String(today.getMonth() + 1).padStart(2, '0')
+          const dd = String(today.getDate()).padStart(2, '0')
+          const todayISO = `${yyyy}-${mm}-${dd}`
+          const key = `planiar:surveyAnswered:${userId ?? 'anon'}`
+          localStorage.setItem(key, todayISO)
+        } catch (e) {}
       } else {
         let errMsg = 'No se pudo guardar la respuesta.'
         try {
@@ -55,6 +65,55 @@ const SurveyBanner: React.FC<SurveyBannerProps> = ({ userId }) => {
       setTimeout(() => setShowSurvey(false), 250)
     }
   }
+
+  // Ensure user can only answer once per day
+  useEffect(() => {
+    const checkAnsweredToday = async () => {
+      const today = new Date()
+      const yyyy = today.getFullYear()
+      const mm = String(today.getMonth() + 1).padStart(2, '0')
+      const dd = String(today.getDate()).padStart(2, '0')
+      const todayISO = `${yyyy}-${mm}-${dd}`
+
+      // If userId provided, query backend for user's surveys and check dates
+      if (userId) {
+        try {
+          const res = await fetch(APIPATH(`/surveys/user/${userId}`))
+          if (res.ok) {
+            const list = await res.json()
+            if (Array.isArray(list)) {
+              const answeredToday = list.some((s: any) => {
+                if (!s) return false
+                const d = s.date || s.createdAt || s.created_at || s.dateSubmitted || ''
+                if (!d) return false
+                // expect backend LocalDate 'YYYY-MM-DD' or ISO string
+                return String(d).startsWith(todayISO)
+              })
+              if (answeredToday) {
+                setShowSurvey(false)
+                return
+              }
+            }
+          }
+        } catch (e) {
+          // ignore backend error and fallback to local storage check
+        }
+      }
+
+      // Fallback: check localStorage (for anonymous users or failed backend calls)
+      try {
+        const key = `planiar:surveyAnswered:${userId ?? 'anon'}`
+        const stored = localStorage.getItem(key)
+        if (stored === todayISO) {
+          setShowSurvey(false)
+        }
+      } catch (e) {
+        // ignore storage errors
+      }
+    }
+
+    checkAnsweredToday()
+  }, [userId])
 
   if (!showSurvey) return null
 
