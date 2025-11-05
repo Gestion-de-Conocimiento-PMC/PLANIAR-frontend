@@ -36,10 +36,13 @@ interface CreateActivityFormProps {
   onBack: () => void
   userId: number | null
   initialData?: any
+  // mode: 'create' | 'edit' - when editing, hide AI tab and change titles
+  mode?: 'create' | 'edit'
 }
 
-export function CreateActivityForm({ onSubmit, onBack, userId, initialData }: CreateActivityFormProps) {
-  const [inputMode, setInputMode] = useState<'manual' | 'ai'>('manual')
+export function CreateActivityForm({ onSubmit, onBack, userId, initialData, mode }: CreateActivityFormProps) {
+  const isEditMode = mode === 'edit' || !!initialData
+  const [inputMode, setInputMode] = useState<'manual' | 'ai'>(isEditMode ? 'manual' : 'manual')
   const [title, setTitle] = useState(initialData?.title || '')
   const [selectedDays, setSelectedDays] = useState<number[]>(initialData?.days || [])
   const [dayTimes, setDayTimes] = useState<Record<number, { start: string; end: string }>>(initialData?.dayTimes || {})
@@ -94,7 +97,7 @@ export function CreateActivityForm({ onSubmit, onBack, userId, initialData }: Cr
   }
 
   const handleSubmit = async () => {
-    if (!validate() || !userId) return
+    if (!validate()) return
     setLoading(true)
 
     try {
@@ -104,27 +107,19 @@ export function CreateActivityForm({ onSubmit, onBack, userId, initialData }: Cr
         startTimes: DAYS_OF_WEEK.map(d => dayTimes[d.id]?.start || '').join(','),
         endTimes: DAYS_OF_WEEK.map(d => dayTimes[d.id]?.end || '').join(','),
         description,
-        startDate: dateFrom,
-        endDate: dateTo,
+        // If the user leaves dates empty (recurring activity), send very distant
+        // start/end dates so the backend receives non-null values but the
+        // activity effectively behaves as ongoing/recurrent.
+        startDate: dateFrom || '1900-01-01',
+        endDate: dateTo || '9999-12-31',
         color: selectedColor,
-        user: { id: userId }
+        userId: userId ?? null,
+        id: initialData?.id,
       }
 
-  const res = await fetch(APIPATH(`/activities/user/${userId}`), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error || 'Error creating activity')
-      }
+      if (onSubmit) onSubmit(payload)
 
-      const result = await res.json()
-      alert('✅ Activity created successfully')
-      if (onSubmit) onSubmit(result)
-
-      // Limpiar formulario
+      // Reset form
       setTitle('')
       setSelectedDays([])
       setDayTimes({})
@@ -135,8 +130,7 @@ export function CreateActivityForm({ onSubmit, onBack, userId, initialData }: Cr
       setErrors({})
 
     } catch (error: any) {
-      alert(error.message)
-      console.error('❌ Error creating activity:', error)
+      console.error('❌ Error preparing activity payload:', error)
     } finally {
       setLoading(false)
     }
@@ -151,26 +145,27 @@ export function CreateActivityForm({ onSubmit, onBack, userId, initialData }: Cr
             <ChevronLeft className="w-5 h-5" />
           </Button>
           <div>
-            <DialogTitle>Create Activity</DialogTitle>
-            <DialogDescription>Add a recurring activity to your schedule</DialogDescription>
+            <DialogTitle>{isEditMode ? 'Edit Activity' : 'Create Activity'}</DialogTitle>
+            <DialogDescription>{isEditMode ? 'Edit the activity details' : 'Add a recurring activity to your schedule'}</DialogDescription>
           </div>
         </div>
       </DialogHeader>
 
       {/* Manual / AI Tabs */}
       <Tabs value={inputMode} onValueChange={(v: any) => setInputMode(v)} className="mt-4">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className={`grid w-full ${isEditMode ? 'grid-cols-1' : 'grid-cols-2'}`}>
           <TabsTrigger value="manual">Manual</TabsTrigger>
-          <TabsTrigger value="ai">AI</TabsTrigger>
+          {!isEditMode && <TabsTrigger value="ai">AI</TabsTrigger>}
         </TabsList>
 
-        <TabsContent value="ai" className="mt-4">
-          <AIUploadView
-            onAnalysisComplete={handleAIAnalysis}
-            analysisType="activity"
-            description="Upload your activity schedule or details"
-          />
-        </TabsContent>
+        {!isEditMode && (
+          <TabsContent value="ai" className="mt-4">
+              <div className="p-6 rounded-lg border border-dashed border-muted-foreground/40 text-center">
+                <p className="text-lg font-medium">AI assistance — coming soon...</p>
+                <p className="text-sm text-muted-foreground mt-2">Upload and AI parsing for activities will be available soon.</p>
+              </div>
+            </TabsContent>
+        )}
 
         <TabsContent value="manual" className="mt-4">
           <div className="space-y-6 max-h-[50vh] overflow-y-auto pr-2" style={{
@@ -335,7 +330,7 @@ export function CreateActivityForm({ onSubmit, onBack, userId, initialData }: Cr
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
                   </svg>
                 )}
-                Create Activity
+                {isEditMode ? 'Save Changes' : 'Create Activity'}
               </Button>
             </div>
           </div>

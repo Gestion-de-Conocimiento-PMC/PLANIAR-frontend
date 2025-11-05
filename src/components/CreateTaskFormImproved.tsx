@@ -19,19 +19,29 @@ interface CreateTaskFormImprovedProps {
   onBack: () => void
   existingClasses: any[]
   userId: number | null
+  initialValues?: any
 }
 
-export function CreateTaskFormImproved({ onSubmit, onBack, userId }: CreateTaskFormImprovedProps) {
+export function CreateTaskFormImproved({ onSubmit, onBack, userId, initialValues }: CreateTaskFormImprovedProps) {
   const [title, setTitle] = useState('')
   const [classId, setClassId] = useState<number | null>(null)
   const [priority, setPriority] = useState<'High' | 'Medium' | 'Low'>('Medium')
   const [date, setDate] = useState('')
+  const [dueTime, setDueTime] = useState('')
+  const [workDate, setWorkDate] = useState('')
   const [estimatedTime, setEstimatedTime] = useState('')
   const [timeUnit, setTimeUnit] = useState('minutes')
+  const [workStart, setWorkStart] = useState('')
+  const [workEnd, setWorkEnd] = useState('')
+  const [taskType, setTaskType] = useState<'Project' | 'Homework' | 'Exam'>('Homework')
   const [description, setDescription] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
   const [classes, setClasses] = useState<ClassData[]>([])
+  // When editing an existing task we keep advanced fields locked until user opts-in
+  const isEditMode = !!initialValues
+  // Advanced panel should be hidden by default for both create and edit; user can opt-in
+  const [showAdvanced, setShowAdvanced] = useState(false)
 
   // 🔹 Cargar clases del usuario
   useEffect(() => {
@@ -49,10 +59,57 @@ export function CreateTaskFormImproved({ onSubmit, onBack, userId }: CreateTaskF
     fetchClasses()
   }, [userId])
 
+  // If initialValues are provided, populate the form (edit mode)
+  useEffect(() => {
+    if (!initialValues) return
+
+    // Map backend fields into local state safely
+    const iv: any = initialValues
+    setTitle(iv.title || '')
+    setClassId(iv.classId ?? iv.class?.id ?? null)
+    setPriority(iv.priority || 'Medium')
+    // support legacy 'date' or 'dueDate'
+    // dueDate and dueTime support
+    if (iv.date) setDate(String(iv.date).split('T')[0])
+    else if (iv.dueDate) setDate(String(iv.dueDate).split('T')[0])
+    else setDate('')
+    // dueTime may be provided as iv.dueTime or embedded in dueDate
+    if (iv.dueTime) setDueTime(String(iv.dueTime).split(':').slice(0,2).join(':'))
+    else if (iv.dueDate && String(iv.dueDate).includes('T')) {
+      const parts = String(iv.dueDate).split('T')
+      if (parts[1]) setDueTime(parts[1].split(':').slice(0,2).join(':'))
+    }
+    setWorkDate(iv.workingDate ? String(iv.workingDate).split('T')[0] : (iv.workDate ? String(iv.workDate).split('T')[0] : ''))
+    setWorkStart(iv.startTime || '')
+    setWorkEnd(iv.endTime || '')
+    setEstimatedTime(iv.estimatedTime ? String(iv.estimatedTime) : '')
+    setTimeUnit('minutes')
+    setTaskType(iv.type || 'Homework')
+    setDescription(iv.description || '')
+
+    // keep advanced hidden initially in edit mode (user asked to only change due date by default)
+    setShowAdvanced(false)
+  }, [initialValues])
+
   const validate = () => {
     const newErrors: Record<string, string> = {}
     if (!title.trim()) newErrors.title = 'Title is required'
-    if (!date) newErrors.date = 'Date is required'
+  if (!date) newErrors.date = 'Date is required'
+  if (!dueTime) newErrors.dueTime = 'Due time is required'
+  // Only require workingDay/start/end when advanced editing is enabled
+  if (showAdvanced) {
+    if (!workDate) newErrors.workDate = 'Select a day to work on this task'
+    if (!workStart) newErrors.workStart = 'Start time is required'
+    if (!workEnd) newErrors.workEnd = 'End time is required'
+  }
+    // Ensure end time is after start time when both provided
+    if (workStart && workEnd) {
+      const [sh, sm] = workStart.split(':').map(x => parseInt(x, 10))
+      const [eh, em] = workEnd.split(':').map(x => parseInt(x, 10))
+      const sMinutes = sh * 60 + (isNaN(sm) ? 0 : sm)
+      const eMinutes = eh * 60 + (isNaN(em) ? 0 : em)
+      if (eMinutes <= sMinutes) newErrors.workEnd = 'End time must be after start time'
+    }
     if (!estimatedTime || parseInt(estimatedTime) <= 0)
       newErrors.estimatedTime = 'Estimated time is required'
     setErrors(newErrors)
@@ -64,45 +121,56 @@ export function CreateTaskFormImproved({ onSubmit, onBack, userId }: CreateTaskF
     setLoading(true)
 
     try {
-      const dateISO = new Date(date).toISOString().split('T')[0]
+  const dateISO = date ? new Date(date).toISOString().split('T')[0] : null
+  const workDateISO = workDate ? new Date(workDate).toISOString().split('T')[0] : null
       const timeInMinutes = timeUnit === 'hours' ? parseInt(estimatedTime) * 60 : parseInt(estimatedTime)
+
+      // Normalize times to HH:MM (no seconds)
+      const normalizeTime = (t: string | null) => {
+        if (!t) return null
+        const parts = t.split(':')
+        if (parts.length >= 2) return `${parts[0].padStart(2,'0')}:${parts[1].padStart(2,'0')}`
+        return t
+      }
 
       const taskPayload = {
         title,
         classId,
-        date: dateISO,
+        // use backend field name 'dueDate'
+        dueDate: dateISO,
+        // dueTime is required: normalized HH:MM
+        dueTime: normalizeTime(dueTime) || null,
+        // backend-friendly fields for scheduling the work session
+        workingDate: workDateISO,
+        startTime: normalizeTime(workStart) || null,
+        endTime: normalizeTime(workEnd) || null,
         priority: priority,
         estimatedTime: timeInMinutes,
         description,
-        type: 'Homework',
+        type: taskType,
         state: 'Pending',
         user: { id: userId },
       }
 
-  const response = await fetch(APIPATH(`/tasks/user/${userId}`), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(taskPayload),
-      })
+      // Delegate creation to parent via onSubmit so App can centralize API calls
+      if (onSubmit) onSubmit(taskPayload)
 
-      if (!response.ok) {
-        const err = await response.json()
-        throw new Error(err.error || 'Error creating task')
+      // Clear form only when creating new tasks. In edit mode keep values (parent may close dialog)
+      if (!isEditMode) {
+        setTitle('')
+        setClassId(null)
+        setPriority('Medium')
+        setDate('')
+        setDueTime('')
+        setWorkDate('')
+        setWorkStart('')
+        setWorkEnd('')
+        setTaskType('Homework')
+        setEstimatedTime('')
+        setDescription('')
       }
-
-      const result = await response.json()
-      alert('✅ Task created successfully')
-      if (onSubmit) onSubmit(result)
-
-      // Limpiar formulario
-      setTitle('')
-      setClassId(null)
-      setPriority('Medium')
-      setDate('')
-      setEstimatedTime('')
-      setDescription('')
     } catch (error: any) {
-      alert(error.message)
+      window.dispatchEvent(new CustomEvent('planiar:notify', { detail: { message: error.message || 'Error creating task' } }))
       console.error('❌ Error creating task:', error)
     } finally {
       setLoading(false)
@@ -148,6 +216,7 @@ export function CreateTaskFormImproved({ onSubmit, onBack, userId }: CreateTaskF
             disabled={classes.length === 0}
           >
             <SelectTrigger>
+              {/* Let the SelectValue render the selected item's content (SelectItem includes the color dot). */}
               <SelectValue
                 placeholder={
                   classes.length === 0
@@ -162,7 +231,13 @@ export function CreateTaskFormImproved({ onSubmit, onBack, userId }: CreateTaskF
               ) : (
                 classes.map((cls) => (
                   <SelectItem key={cls.id} value={cls.id.toString()}>
-                    {cls.title}
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: cls.color }}
+                      />
+                      {cls.title}
+                    </div>
                   </SelectItem>
                 ))
               )}
@@ -204,20 +279,89 @@ export function CreateTaskFormImproved({ onSubmit, onBack, userId }: CreateTaskF
           </div>
         </div>
 
-        {/* Date */}
+        {/* Due Date + Time */}
         <div className="space-y-2">
-          <Label htmlFor="date">
-            Date <span className="text-destructive">*</span>
+          <Label>
+            Due Date & Time <span className="text-destructive">*</span>
           </Label>
-          <Input
-            id="date"
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className={errors.date ? 'border-destructive' : ''}
-          />
-          {errors.date && <p className="text-sm text-destructive">{errors.date}</p>}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <Input
+                id="date"
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className={errors.date ? 'border-destructive' : ''}
+              />
+              {errors.date && <p className="text-sm text-destructive">{errors.date}</p>}
+            </div>
+            <div className="md:col-span-2">
+              <Input
+                id="dueTime"
+                type="time"
+                value={dueTime}
+                onChange={(e) => setDueTime(e.target.value)}
+                className={errors.dueTime ? 'border-destructive' : ''}
+              />
+              {errors.dueTime && <p className="text-sm text-destructive">{errors.dueTime}</p>}
+            </div>
+          </div>
         </div>
+
+        {/* Task Type */}
+        <div className="space-y-2">
+          <Label>Type</Label>
+          <Select value={taskType} onValueChange={(v) => setTaskType(v as any)}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Project">Project</SelectItem>
+              <SelectItem value="Homework">Homework</SelectItem>
+              <SelectItem value="Exam">Exam</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Working Day & Time. In edit mode advanced editing is off by default. */}
+        {showAdvanced ? (
+          <div className="space-y-2 grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <Label htmlFor="workDate">Work Day <span className="text-destructive">*</span></Label>
+              <Input id="workDate" type="date" value={workDate} onChange={(e) => setWorkDate(e.target.value)} className={errors.workDate ? 'border-destructive' : ''} />
+              {errors.workDate && <p className="text-sm text-destructive">{errors.workDate}</p>}
+            </div>
+
+            <div>
+              <Label htmlFor="workStart">Start Time <span className="text-destructive">*</span></Label>
+              <Input id="workStart" type="time" value={workStart} onChange={(e) => setWorkStart(e.target.value)} className={errors.workStart ? 'border-destructive' : ''} />
+              {errors.workStart && <p className="text-sm text-destructive">{errors.workStart}</p>}
+            </div>
+
+            <div>
+              <Label htmlFor="workEnd">End Time <span className="text-destructive">*</span></Label>
+              <Input id="workEnd" type="time" value={workEnd} onChange={(e) => setWorkEnd(e.target.value)} className={errors.workEnd ? 'border-destructive' : ''} />
+              {errors.workEnd && <p className="text-sm text-destructive">{errors.workEnd}</p>}
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-2 p-3 rounded border bg-muted/10">
+            <div className="flex items-center justify-between">
+              <Label>Work session (read-only)</Label>
+              <Button size="sm" variant="outline" onClick={() => setShowAdvanced(true)}>Advanced</Button>
+            </div>
+            <div className="grid grid-cols-1 gap-2 mt-2 text-sm text-muted-foreground">
+              <div>
+                <div className="text-xs text-muted-foreground">Work Day</div>
+                <div>{workDate ? new Date(workDate).toLocaleDateString() : 'Not set'}</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">Start — End</div>
+                <div>{(workStart || workEnd) ? `${workStart || 'TBD'} - ${workEnd || 'TBD'}` : 'Not set'}</div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Estimated Time */}
         <div className="space-y-2">
@@ -266,12 +410,15 @@ export function CreateTaskFormImproved({ onSubmit, onBack, userId }: CreateTaskF
           <Button variant="outline" onClick={onBack}>
             Cancel
           </Button>
+          <Button variant="ghost" onClick={() => setShowAdvanced(s => !s)}>
+            {showAdvanced ? 'Hide advanced' : 'Advanced'}
+          </Button>
           <Button
             onClick={handleSubmit}
             className="bg-[#7B61FF] hover:bg-[#6B51EF]"
             disabled={loading}
           >
-            {loading ? 'Creating...' : 'Create Task'}
+            {loading ? (isEditMode ? 'Saving...' : 'Creating...') : (isEditMode ? 'Save' : 'Create Task')}
           </Button>
         </div>
       </div>

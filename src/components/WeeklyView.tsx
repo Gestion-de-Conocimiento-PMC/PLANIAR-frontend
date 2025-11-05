@@ -10,11 +10,14 @@ interface TaskItem {
   id: number
   title: string
   classId?: number
-  date: string
+  date?: string
+  workingDate?: string
+  startTime?: string
+  endTime?: string
   priority?: 'High' | 'Medium' | 'Low'
   estimatedTime?: number
   description?: string
-  type?: 'Homework' | 'Activity'
+  type?: 'Project' | 'Homework' | 'Exam' | 'Activity'
   state?: 'Pending' | 'In Progress' | 'Completed'
   subject?: string
 }
@@ -41,6 +44,43 @@ export function WeeklyView({ userId }: WeeklyViewProps) {
   const [currentWeek, setCurrentWeek] = useState(0)
   const [loading, setLoading] = useState(false)
   const scrollRef = useRef<HTMLDivElement | null>(null)
+  // Refresh counter state for "Refresh my plan" (persisted per user and reset monthly)
+  const maxRefreshCount = 3
+  const storageMetaKey = `planiar:refreshCountMeta:${userId ?? 'anon'}`
+  const getCurrentMonth = () => new Date().toISOString().slice(0, 7) // YYYY-MM
+
+  // Try to read a role for the current user from localStorage (if set). Default to 'user'.
+  const [userRole] = useState<string>(() => {
+    try {
+      return localStorage.getItem('planiar:userRole') || 'user'
+    } catch {
+      return 'user'
+    }
+  })
+
+  const [refreshCount, setRefreshCount] = useState<number>(() => {
+    try {
+      const raw = localStorage.getItem(storageMetaKey)
+      if (!raw) return maxRefreshCount
+      const meta = JSON.parse(raw)
+      if (!meta || typeof meta !== 'object') return maxRefreshCount
+      if (meta.month !== getCurrentMonth()) return maxRefreshCount
+      const n = parseInt(String(meta.count), 10)
+      return Number.isFinite(n) ? Math.max(0, Math.min(maxRefreshCount, n)) : maxRefreshCount
+    } catch {
+      return maxRefreshCount
+    }
+  })
+
+  // Persist refresh metadata (count + month)
+  useEffect(() => {
+    try {
+      const meta = { count: refreshCount, month: getCurrentMonth() }
+      localStorage.setItem(storageMetaKey, JSON.stringify(meta))
+    } catch {
+      // ignore storage errors
+    }
+  }, [refreshCount, storageMetaKey])
 
   const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
@@ -68,35 +108,32 @@ export function WeeklyView({ userId }: WeeklyViewProps) {
 
     const fetchData = async () => {
       setLoading(true)
-      const fetchedTasks: TaskItem[] = []
-      const fetchedActivities: ActivityItem[] = []
-
-      for (const date of weekDates) {
-        const dateStr = date.toISOString().split('T')[0]
-
-        try {
-          const res = await fetch(APIPATH(`/tasks/user/${userId}/date/${dateStr}`))
-          if (res.ok) {
-            const dayTasks: TaskItem[] = await res.json()
-            fetchedTasks.push(...dayTasks)
-          }
-        } catch (err) {
-          console.error('Error fetching tasks:', err)
+      try {
+        // Fetch all tasks for the user and filter client-side by workingDate or due date
+        const tRes = await fetch(APIPATH(`/tasks/user/${userId}`))
+        if (tRes.ok) {
+          const allTasks: TaskItem[] = await tRes.json()
+          setTasks(allTasks)
+        } else {
+          setTasks([])
         }
-
-        try {
-          const res = await fetch(APIPATH(`/activities/user/${userId}/date/${dateStr}`))
-          if (res.ok) {
-            const dayActivities: ActivityItem[] = await res.json()
-            fetchedActivities.push(...dayActivities)
-          }
-        } catch (err) {
-          console.error('Error fetching activities:', err)
-        }
+      } catch (err) {
+        console.error('Error fetching tasks:', err)
+        setTasks([])
       }
 
-      setTasks(fetchedTasks)
-      setActivities(fetchedActivities)
+      try {
+        const aRes = await fetch(APIPATH(`/activities/user/${userId}`))
+        if (aRes.ok) {
+          const allActivities: ActivityItem[] = await aRes.json()
+          setActivities(allActivities)
+        } else {
+          setActivities([])
+        }
+      } catch (err) {
+        console.error('Error fetching activities:', err)
+        setActivities([])
+      }
       setLoading(false)
     }
 
@@ -118,8 +155,77 @@ export function WeeklyView({ userId }: WeeklyViewProps) {
   }, [tasks, activities, currentWeek])
 
   const getTasksForDay = (date: Date) => {
-    const dateStr = date.toISOString().split('T')[0]
-    return tasks.filter(t => t.date.startsWith(dateStr))
+    // Build a local YYYY-MM-DD string to avoid timezone shifts caused by toISOString()
+    const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
+      date.getDate()
+    ).padStart(2, '0')}`
+    const parseDateVal = (v: any) => {
+      if (!v) return null
+      if (typeof v === 'string') return v.split('T')[0]
+      if (typeof v === 'object' && v.year && v.month && v.day) {
+        return `${v.year}-${String(v.month).padStart(2,'0')}-${String(v.day).padStart(2,'0')}`
+      }
+      return String(v).split('T')[0]
+    }
+
+    return tasks.filter(t => {
+      // Support multiple possible field names returned by different backends
+      const raw = (t as any).workingDate ?? (t as any).working_date ?? (t as any).date ?? (t as any).dueDate ?? (t as any).due_date ?? null
+      const wd = parseDateVal(raw)
+      if (!wd) return false
+      return wd === dateStr
+    })
+  }
+
+  const parseDateVal = (v: any) => {
+    if (!v) return ''
+    if (typeof v === 'string') return v.split('T')[0]
+    if (typeof v === 'object' && v.year && v.month && v.day) return `${v.year}-${String(v.month).padStart(2,'0')}-${String(v.day).padStart(2,'0')}`
+    return String(v)
+  }
+
+  // Create a local-date formatted string safely from a YYYY-MM-DD or other ISO-ish input
+  const toLocalDateString = (isoLike: string | null | undefined) => {
+    if (!isoLike) return ''
+    const s = String(isoLike)
+    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    if (m) {
+      const y = Number(m[1])
+      const mo = Number(m[2]) - 1
+      const d = Number(m[3])
+      return new Date(y, mo, d).toLocaleDateString()
+    }
+    const parsed = new Date(s)
+    if (!isNaN(parsed.getTime())) return parsed.toLocaleDateString()
+    return s
+  }
+
+  const parseTimeVal = (v: any) => {
+    if (!v) return ''
+    if (typeof v === 'string') {
+      // If value is an ISO datetime, extract time after 'T'
+      if (v.includes('T')) {
+        const timePart = v.split('T')[1]
+        if (timePart) {
+          const hhmm = timePart.split(':')
+          return hhmm.length >= 2 ? `${hhmm[0].padStart(2,'0')}:${hhmm[1].padStart(2,'0')}` : v
+        }
+      }
+      const parts = v.split(':')
+      return parts.length >= 2 ? `${parts[0].padStart(2,'0')}:${parts[1].padStart(2,'0')}` : v
+    }
+    if (typeof v === 'object' && v.hour !== undefined) {
+      return `${String(v.hour).padStart(2,'0')}:${String(v.minute ?? v.min ?? 0).padStart(2,'0')}`
+    }
+    return String(v)
+  }
+
+  const formatTimeShort = (t?: string) => {
+    if (!t) return ''
+    // strip seconds if present and keep only HH:MM
+    const parts = String(t).split(':')
+    if (parts.length >= 2) return `${parts[0].padStart(2,'0')}:${parts[1].padStart(2,'0')}`
+    return t
   }
 
   const getActivitiesForDay = (date: Date) => {
@@ -159,6 +265,9 @@ export function WeeklyView({ userId }: WeeklyViewProps) {
 
   const getClassesCountForDay = (date: Date) => 0
 
+  // whether the refresh action is available (admins always have it)
+  const isRefreshAvailable = userRole !== 'user' || refreshCount > 0
+
   return (
     <>
       {/* Header */}
@@ -175,7 +284,7 @@ export function WeeklyView({ userId }: WeeklyViewProps) {
       </div>
 
       {/* Weekly Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-6 flex items-center justify-between">
             <div>
@@ -216,7 +325,7 @@ export function WeeklyView({ userId }: WeeklyViewProps) {
 
       {/* Week Navigation */}
       <Card className="p-4">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-4">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-4">
           <div className="flex items-center justify-center gap-4">
             <Button variant="outline" size="icon" onClick={() => setCurrentWeek(currentWeek - 1)}>
               <ChevronLeft className="w-4 h-4" />
@@ -228,13 +337,37 @@ export function WeeklyView({ userId }: WeeklyViewProps) {
               <ChevronRight className="w-4 h-4" />
             </Button>
           </div>
-          <Button
-            onClick={() => setCurrentWeek(0)}
-            className="gap-2 bg-[#7C3AED] hover:bg-[#6D28D9] text-white border-0 w-full lg:w-auto"
-          >
-            <Circle className="w-4 h-4" />
-            <span>Today</span>
-          </Button>
+          <div className="flex flex-col lg:flex-row items-center gap-3 w-full lg:w-auto">
+            <Button
+              onClick={() => setCurrentWeek(0)}
+              className="gap-2 bg-[#7C3AED] hover:bg-[#6D28D9] text-white border-0 w-full lg:w-auto"
+            >
+              <Circle className="w-4 h-4" />
+              <span>Today</span>
+            </Button>
+
+            {/* Refresh my plan button with dynamic counter (persisted monthly). Admins have unlimited refreshes. */}
+            <Button
+              size="sm"
+              className={`gap-2 ${isRefreshAvailable ? 'bg-[#7C3AED] hover:bg-[#6D28D9] text-white border-0 w-full lg:w-auto' : 'border-[#7B61FF] text-[#7B61FF] bg-white w-full lg:w-auto'}`}
+              onClick={() => {
+                if (userRole !== 'user') {
+                  window.dispatchEvent(new CustomEvent('planiar:notify', { detail: { message: 'Unlimited refreshes for your role' } }))
+                  return
+                }
+                if (refreshCount <= 0) {
+                  window.dispatchEvent(new CustomEvent('planiar:notify', { detail: { message: 'No refreshes left for this month' } }))
+                  return
+                }
+                setRefreshCount(c => c - 1)
+                window.dispatchEvent(new CustomEvent('planiar:notify', { detail: { message: 'Plan refreshed (simulated)' } }))
+              }}
+              disabled={!isRefreshAvailable}
+            >
+              <span>Refresh my plan</span>
+              <Badge className="ml-2">{userRole === 'user' ? `${refreshCount}/${maxRefreshCount}` : '∞'}</Badge>
+            </Button>
+          </div>
         </div>
 
         {/* Daily Widgets */}
@@ -270,7 +403,7 @@ export function WeeklyView({ userId }: WeeklyViewProps) {
                           {formatDate(date)}
                         </p>
                       </div>
-                      {isTodayDate && <Badge className="bg-[#7B61FF] text-white">Hoy</Badge>}
+                      {isTodayDate && <Badge className="bg-[#7B61FF] text-white">Today</Badge>}
                     </div>
 
                     <ScrollArea className="h-[400px] pr-2">
@@ -284,12 +417,17 @@ export function WeeklyView({ userId }: WeeklyViewProps) {
                           {dayActivities.map((item, idx) => (
                             <div
                               key={`activity-${idx}`}
-                              className="p-3 rounded-lg border bg-background hover:shadow-sm transition-all"
+                              className="p-3 rounded-lg border hover:shadow-sm transition-all"
+                              style={{
+                                backgroundColor: item.color ? `${item.color}15` : undefined,
+                                borderColor: item.color || '#7B61FF',
+                                borderWidth: 1
+                              }}
                             >
                               <div className="flex items-center justify-between mb-1">
-                                <p className="font-medium text-sm">{item.title}</p>
-                                <Badge className="text-xs bg-[#1E90FF]/10 text-[#1E90FF]">
-                                  {item.startTimes.split(',')[date.getDay()] || 'TBD'}
+                                <p className="font-medium text-sm" style={{ color: item.color || '#7B61FF' }}>{item.title}</p>
+                                <Badge className="text-xs" style={{ backgroundColor: (item.color || '#1E90FF') + '10', color: item.color || '#1E90FF' }}>
+                                  {String(item.startTimes || '').split(',')[date.getDay()] || 'TBD'}
                                 </Badge>
                               </div>
                               {item.description && <p className="text-xs text-muted-foreground mt-1">{item.description}</p>}
@@ -310,6 +448,25 @@ export function WeeklyView({ userId }: WeeklyViewProps) {
                                     </p>
                                   </div>
                                   {item.subject && <p className="text-xs text-muted-foreground mt-1">{item.subject}</p>}
+                                  {/* Show due date and work hours */}
+                                  <div className="mt-1">
+                                    {/* Show due date and due time on the same line */}
+                                    {(((item as any).date) || ((item as any).dueDate)) && (
+                                      <div className="text-xs text-muted-foreground">
+                                        Due: {toLocalDateString(parseDateVal((item as any).dueDate || (item as any).date))} 
+                                        {((item as any).dueTime || (item as any).due_time) && (
+                                          <span className="ml-2"> • {parseTimeVal((item as any).dueTime ?? (item as any).due_time)}</span>
+                                        )}
+                                      </div>
+                                    )}
+
+                                    {/* Start/End work times (show below the due line) */}
+                                    {((item as any).startTime || (item as any).start_time) && ((item as any).endTime || (item as any).end_time) && (
+                                      <div className="text-xs font-medium mt-1" style={{ color: '#1E90FF' }}>
+                                        {parseTimeVal((item as any).startTime ?? (item as any).start_time)} - {parseTimeVal((item as any).endTime ?? (item as any).end_time)}
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
                                 {item.priority && <Badge className={`text-xs ${getPriorityBadge(item.priority)}`}>{item.priority}</Badge>}
                               </div>

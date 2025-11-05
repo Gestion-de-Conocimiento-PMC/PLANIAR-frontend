@@ -13,8 +13,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { useState } from 'react'
 
 interface UserAvatarProps {
-  // Accept flexible user shape returned by backend: may contain `name`, `username`, `email`, etc.
-  user: { name?: string; username?: string; email?: string } | null
+  // Accept flexible user shape returned by backend: may contain `id`, `name`, `username`, `email`, `registrationDate`, `registeredAt`, etc.
+  user: { id?: string | number; name?: string; username?: string; email?: string; registrationDate?: string; registeredAt?: string } | null
   onLogout: () => void
   onEditClasses: () => void
 }
@@ -68,11 +68,11 @@ export function UserAvatar({ user, onLogout, onEditClasses }: UserAvatarProps) {
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => setShowProfile(true)}>
             <User className="mr-2 h-4 w-4" />
-            <span>Mi perfil</span>
+            {"Profile"}
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => setShowOptions(true)}>
             <Settings className="mr-2 h-4 w-4" />
-            <span>Opciones</span>
+            <span>Options</span>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={onLogout} className="text-red-600">
@@ -82,7 +82,7 @@ export function UserAvatar({ user, onLogout, onEditClasses }: UserAvatarProps) {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Mi Perfil Dialog */}
+      {/* Profile Dialog */}
       <Dialog open={showProfile} onOpenChange={setShowProfile}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -93,7 +93,7 @@ export function UserAvatar({ user, onLogout, onEditClasses }: UserAvatarProps) {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <label className="text-sm">Name</label>
+              <label className="text-sm">Username</label>
               <p className="text-base">{displayName}</p>
             </div>
             <div className="space-y-2">
@@ -106,7 +106,20 @@ export function UserAvatar({ user, onLogout, onEditClasses }: UserAvatarProps) {
             </div>
             <div className="space-y-2">
               <label className="text-sm">Member since</label>
-              <p className="text-base">October 2025</p>
+              <p className="text-base">
+                {(() => {
+                  const rd = user?.registrationDate || user?.registeredAt || null
+                  if (!rd) return '—'
+                  const s = String(rd)
+                  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/)
+                  let d: Date
+                  if (m) d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+                  else d = new Date(s)
+                  if (isNaN(d.getTime())) return s
+                  // Show full date in English (month name in English): day, month (long) and year.
+                  return d.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })
+                })()}
+              </p>
             </div>
           </div>
         </DialogContent>
@@ -116,7 +129,7 @@ export function UserAvatar({ user, onLogout, onEditClasses }: UserAvatarProps) {
       <Dialog open={showOptions} onOpenChange={setShowOptions}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Opciones</DialogTitle>
+            <DialogTitle>Options</DialogTitle>
             <DialogDescription>
               Application configuration
             </DialogDescription>
@@ -124,11 +137,11 @@ export function UserAvatar({ user, onLogout, onEditClasses }: UserAvatarProps) {
           <div className="space-y-4 py-4">
             <div className="flex items-center justify-between">
               <label className="text-sm">Notifications</label>
-              <div className="text-muted-foreground text-sm">Coming soon</div>
+              <div className="text-muted-foreground text-sm">Coming soon...</div>
             </div>
             <div className="flex items-center justify-between">
               <label className="text-sm">Theme</label>
-              <div className="text-muted-foreground text-sm">Coming soon</div>
+              <div className="text-muted-foreground text-sm">Coming soon...</div>
             </div>
             <div className="flex items-center justify-between">
               <label className="text-sm">Language</label>
@@ -136,7 +149,25 @@ export function UserAvatar({ user, onLogout, onEditClasses }: UserAvatarProps) {
             </div>
             <div className="flex items-center justify-between">
               <label className="text-sm">Time zone</label>
-              <div className="text-muted-foreground text-sm">GMT-6</div>
+              <div className="text-muted-foreground text-sm">GMT-5</div>
+            </div>
+            <div className="pt-2">
+              <Button
+                onClick={() => {
+                  try {
+                    const key = `planiar:tutorialSeen:${user?.id ?? user?.email}`
+                    localStorage.removeItem(key)
+                  } catch (e) {
+                    // ignore storage errors
+                  }
+                  // Ask the tutorial component to show itself
+                  window.dispatchEvent(new Event('planiar:showTutorial'))
+                  setShowOptions(false)
+                }}
+                className="w-full bg-[#7B61FF] text-white"
+              >
+                Show Tutorial
+              </Button>
             </div>
           </div>
         </DialogContent>

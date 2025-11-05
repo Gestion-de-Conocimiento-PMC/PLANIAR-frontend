@@ -6,7 +6,8 @@ interface TaskBlockProps {
   startHour: number
   duration: number
   heightPerHour: number
-  onClick?: (e?: any) => void
+  // onClick receives the task item
+  onClick?: (item?: any) => void
 }
 
 export function TaskBlock({ taskData, startHour, duration, heightPerHour, onClick }: TaskBlockProps) {
@@ -16,10 +17,10 @@ export function TaskBlock({ taskData, startHour, duration, heightPerHour, onClic
   return (
     <div
       className="mx-2 mb-1 rounded-lg border transition-all shadow-sm"
-      onClick={(e) => { e.stopPropagation(); onClick?.(e as any) }}
+      onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClick?.(taskData) }}
       role="button"
       tabIndex={0}
-      onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onClick?.(e as any) } }}
+      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); onClick?.(taskData) } }}
       style={{
         height: `${height}px`,
         backgroundColor: `${color}15`,

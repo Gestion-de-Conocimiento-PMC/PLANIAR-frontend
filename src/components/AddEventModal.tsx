@@ -152,7 +152,7 @@ export function AddEventModal({
           {selectedType === 'class' && (
             <CreateClassForm
               onSubmit={(data) => {
-                onCreateClass({data, userId})
+                onCreateClass(data)
                 handleClose()
               }}
               onBack={handleBack}
@@ -162,7 +162,7 @@ export function AddEventModal({
           {selectedType === 'activity' && (
             <CreateActivityForm
               onSubmit={(data) => {
-                onCreateActivity({data, userId})
+                onCreateActivity(data)
                 handleClose()
               }}
               onBack={handleBack}
@@ -172,7 +172,7 @@ export function AddEventModal({
           {selectedType === 'task' && (
             <CreateTaskFormImproved
               onSubmit={(data) => {
-                onCreateTask({data, userId})
+                  onCreateTask(data)
                 handleClose()
               }}
               onBack={handleBack}

@@ -8,7 +8,7 @@ export function Handoff() {
       <div className="space-y-2">
         <h1 className="text-3xl">AI Planner - Handoff Documentation</h1>
         <p className="text-muted-foreground">
-          Documento de entrega con tokens, componentes y notas de interacción
+          Handoff document with design tokens, components and interaction notes
         </p>
       </div>
 
@@ -18,12 +18,12 @@ export function Handoff() {
       <Card>
         <CardHeader>
           <CardTitle>Design Tokens</CardTitle>
-          <CardDescription>Colores, espaciados y tipografías del sistema</CardDescription>
+          <CardDescription>Colors, spacing and typography of the system</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Colors */}
           <div className="space-y-3">
-            <h3 className="font-semibold">Colores</h3>
+            <h3 className="font-semibold">Colors</h3>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <div className="w-full h-16 rounded-lg bg-[#7B61FF] border"></div>
@@ -60,7 +60,7 @@ export function Handoff() {
 
           {/* Spacing */}
           <div className="space-y-3">
-            <h3 className="font-semibold">Espaciados</h3>
+            <h3 className="font-semibold">Spacing</h3>
             <div className="space-y-2">
               <div className="flex items-center gap-4">
                 <div className="w-16 h-8 bg-[#7B61FF]/20 rounded"></div>
@@ -83,7 +83,7 @@ export function Handoff() {
 
           {/* Typography */}
           <div className="space-y-3">
-            <h3 className="font-semibold">Tipografía</h3>
+            <h3 className="font-semibold">Typography</h3>
             <div className="space-y-2">
               <div>
                 <p className="text-xs text-muted-foreground">text-xs</p>
@@ -113,41 +113,41 @@ export function Handoff() {
       {/* Components Section */}
       <Card>
         <CardHeader>
-          <CardTitle>Componentes Creados/Actualizados</CardTitle>
-          <CardDescription>Lista de componentes y sus variantes</CardDescription>
+          <CardTitle>Components Created/Updated</CardTitle>
+          <CardDescription>List of components and their variants</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3">
             <div className="p-4 border rounded-lg space-y-2">
               <div className="flex items-center justify-between">
                 <code className="text-sm font-semibold">Login</code>
-                <Badge>Nuevo</Badge>
+                <Badge>New</Badge>
               </div>
               <p className="text-sm text-muted-foreground">
-                Componente de inicio de sesión con campos Email y Password
+                Login component with Email and Password fields
               </p>
-              <p className="text-xs">Ubicación: <code>/components/Login.tsx</code></p>
+              <p className="text-xs">Location: <code>/components/Login.tsx</code></p>
             </div>
 
             <div className="p-4 border rounded-lg space-y-2">
               <div className="flex items-center justify-between">
                 <code className="text-sm font-semibold">UserAvatar</code>
-                <Badge>Nuevo</Badge>
+                <Badge>New</Badge>
               </div>
               <p className="text-sm text-muted-foreground">
-                Avatar con dropdown: Mi perfil, Opciones, Log Out
+                Avatar with dropdown: My profile, Settings, Log Out
               </p>
-              <p className="text-xs">Ubicación: <code>/components/UserAvatar.tsx</code></p>
+              <p className="text-xs">Location: <code>/components/UserAvatar.tsx</code></p>
               <p className="text-xs">Variantes: expanded/collapsed</p>
             </div>
 
             <div className="p-4 border rounded-lg space-y-2">
               <div className="flex items-center justify-between">
                 <code className="text-sm font-semibold">Btn/AddTask</code>
-                <Badge variant="secondary">Actualizado</Badge>
+                <Badge variant="secondary">Updated</Badge>
               </div>
               <p className="text-sm text-muted-foreground">
-                Botón grande morado (48x48px min) que abre modal
+                Large purple button (48x48px min) that opens a modal
               </p>
               <p className="text-xs">Estados: default, hover, active</p>
               <p className="text-xs">Color: #7B61FF (hover: #6B51EF)</p>
@@ -156,22 +156,22 @@ export function Handoff() {
             <div className="p-4 border rounded-lg space-y-2">
               <div className="flex items-center justify-between">
                 <code className="text-sm font-semibold">Modal/AddTask</code>
-                <Badge>Nuevo</Badge>
+                <Badge>New</Badge>
               </div>
               <p className="text-sm text-muted-foreground">
-                Popup modal centrado con todos los campos de TaskInput
+                Centered popup modal with all TaskInput fields
               </p>
-              <p className="text-xs">Animación: fade + translateY(6px), 180-240ms</p>
-              <p className="text-xs">Focus trap habilitado</p>
+              <p className="text-xs">Animation: fade + translateY(6px), 180-240ms</p>
+              <p className="text-xs">Focus trap enabled</p>
             </div>
 
             <div className="p-4 border rounded-lg space-y-2">
               <div className="flex items-center justify-between">
                 <code className="text-sm font-semibold">Dashboard</code>
-                <Badge variant="secondary">Actualizado</Badge>
+                <Badge variant="secondary">Updated</Badge>
               </div>
               <p className="text-sm text-muted-foreground">
-                Contiene 4 panels: Average Task Duration, This Week's Load, Priority Focus, Productivity Recommendations
+                Contains 4 panels: Average Task Duration, This Week's Load, Priority Focus, Productivity Recommendations
               </p>
               <p className="text-xs">Ubicación: <code>/components/Dashboard.tsx</code></p>
             </div>
@@ -179,63 +179,63 @@ export function Handoff() {
             <div className="p-4 border rounded-lg space-y-2">
               <div className="flex items-center justify-between">
                 <code className="text-sm font-semibold">Panel/AverageTaskDuration</code>
-                <Badge>Integrado</Badge>
+                <Badge>Integrated</Badge>
               </div>
               <p className="text-sm text-muted-foreground">
-                Widget que muestra duración promedio de tareas
+                Widget that shows average task duration
               </p>
             </div>
 
             <div className="p-4 border rounded-lg space-y-2">
               <div className="flex items-center justify-between">
                 <code className="text-sm font-semibold">Panel/ThisWeeksLoad</code>
-                <Badge>Integrado</Badge>
+                <Badge>Integrated</Badge>
               </div>
               <p className="text-sm text-muted-foreground">
-                Widget que muestra carga de trabajo semanal
+                Widget that shows weekly workload
               </p>
             </div>
 
             <div className="p-4 border rounded-lg space-y-2">
               <div className="flex items-center justify-between">
                 <code className="text-sm font-semibold">Panel/PriorityFocus</code>
-                <Badge>Integrado</Badge>
+                <Badge>Integrated</Badge>
               </div>
               <p className="text-sm text-muted-foreground">
-                Widget que muestra tareas de alta prioridad pendientes
+                Widget that shows pending high-priority tasks
               </p>
             </div>
 
             <div className="p-4 border rounded-lg space-y-2">
               <div className="flex items-center justify-between">
                 <code className="text-sm font-semibold">Panel/ProductivityRecommendations</code>
-                <Badge>Integrado</Badge>
+                <Badge>Integrated</Badge>
               </div>
               <p className="text-sm text-muted-foreground">
-                Panel completo con recomendaciones personalizadas
+                Full panel with personalized recommendations
               </p>
             </div>
 
             <div className="p-4 border rounded-lg space-y-2">
               <div className="flex items-center justify-between">
                 <code className="text-sm font-semibold">WeeklyView</code>
-                <Badge variant="secondary">Actualizado</Badge>
+                <Badge variant="secondary">Updated</Badge>
               </div>
               <p className="text-sm text-muted-foreground">
-                Planeador semanal sin sidebar. Scroll horizontal habilitado
+                Weekly planner without sidebar. Horizontal scroll enabled
               </p>
-              <p className="text-xs">Sidebar lateral izquierdo eliminado completamente</p>
+              <p className="text-xs">Left sidebar fully removed</p>
             </div>
 
             <div className="p-4 border rounded-lg space-y-2">
               <div className="flex items-center justify-between">
                 <code className="text-sm font-semibold">DayColumn/TaskCard</code>
-                <Badge variant="secondary">Mantenido</Badge>
+                <Badge variant="secondary">Maintained</Badge>
               </div>
               <p className="text-sm text-muted-foreground">
-                Tarjetas de días con tareas
+                Day cards with tasks
               </p>
-              <p className="text-xs">Variantes: Pending, In Progress, Done (sin cambios)</p>
+              <p className="text-xs">Variants: Pending, In Progress, Done (no changes)</p>
             </div>
           </div>
         </CardContent>
@@ -244,53 +244,53 @@ export function Handoff() {
       {/* Interaction Notes */}
       <Card>
         <CardHeader>
-          <CardTitle>Notas de Interacción</CardTitle>
-          <CardDescription>Comportamientos y flujos principales</CardDescription>
+          <CardTitle>Interaction Notes</CardTitle>
+          <CardDescription>Main behaviors and flows</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-3">
             <div className="p-4 bg-muted/50 rounded-lg">
-              <h4 className="font-semibold mb-2">🔴 Cambios Principales</h4>
+              <h4 className="font-semibold mb-2">🔴 Key Changes</h4>
               <ul className="list-disc list-inside space-y-1 text-sm">
-                <li><strong>Add Task:</strong> Ahora abre modal popup (antigua página eliminada)</li>
-                <li><strong>AI Analysis submenu:</strong> Eliminado del header</li>
-                <li><strong>Dashboard:</strong> Contiene 4 panels específicos listados arriba</li>
-                <li><strong>Weekly Planner:</strong> Sidebar izquierdo completamente eliminado</li>
-                <li><strong>Header:</strong> Solo 3 submenús - Dashboard, Weekly Planner, Task</li>
+                <li><strong>Add Task:</strong> Now opens a modal popup (previous standalone page removed)</li>
+                <li><strong>AI Analysis submenu:</strong> Removed from the header</li>
+                <li><strong>Dashboard:</strong> Contains 4 specific panels listed above</li>
+                <li><strong>Weekly Planner:</strong> Left sidebar fully removed</li>
+                <li><strong>Header:</strong> Only 3 submenus - Dashboard, Weekly Planner, Tasks</li>
               </ul>
             </div>
 
             <div className="p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200">
-              <h4 className="font-semibold mb-2">📱 Flujo de Usuario/Login</h4>
+              <h4 className="font-semibold mb-2">📱 User Flow / Login</h4>
               <ul className="list-disc list-inside space-y-1 text-sm">
-                <li>Login (iniciar sesión) → Dashboard</li>
-                <li>Avatar → dropdown (Mi perfil / Opciones / Log Out)</li>
-                <li>Log Out → vuelve a Login</li>
-                <li>Mi perfil: muestra información personal (nombre, correo, rol, fecha)</li>
-                <li>Opciones: menú visual sin funcionalidad (próximamente)</li>
+                <li>Login → Dashboard</li>
+                <li>Avatar → dropdown (My profile / Settings / Log Out)</li>
+                <li>Log Out → returns to Login</li>
+                <li>My profile: shows personal info (name, email, role, date)</li>
+                <li>Settings: visual menu without functionality (coming soon)</li>
               </ul>
             </div>
 
             <div className="p-4 bg-purple-50 dark:bg-purple-950/20 rounded-lg border border-purple-200">
-              <h4 className="font-semibold mb-2">⚡ Prototipo de Interacciones</h4>
+              <h4 className="font-semibold mb-2">⚡ Interaction Prototype</h4>
               <ul className="list-disc list-inside space-y-1 text-sm">
-                <li><strong>Botón Add Task:</strong> onClick → abre modal (overlay) con fade animation</li>
-                <li><strong>Avatar:</strong> onClick → dropdown expandido/colapsado</li>
-                <li><strong>Log Out:</strong> onClick → navega a Login page</li>
-                <li><strong>Tabs de header:</strong> navegación entre Dashboard / Weekly Planner / Task</li>
-                <li><strong>Weekly Planner:</strong> scroll horizontal habilitado entre días</li>
-                <li><strong>Modal Add Task:</strong> focus trap activo, ESC para cerrar</li>
+                <li><strong>Add Task button:</strong> onClick → opens modal (overlay) with fade animation</li>
+                <li><strong>Avatar:</strong> onClick → dropdown expand/collapse</li>
+                <li><strong>Log Out:</strong> onClick → navigate to Login page</li>
+                <li><strong>Header tabs:</strong> navigation between Dashboard / Weekly Planner / Tasks</li>
+                <li><strong>Weekly Planner:</strong> horizontal scroll enabled between days</li>
+                <li><strong>Add Task Modal:</strong> focus trap enabled, ESC to close</li>
               </ul>
             </div>
 
             <div className="p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200">
-              <h4 className="font-semibold mb-2">♿ Accesibilidad</h4>
+              <h4 className="font-semibold mb-2">♿ Accessibility</h4>
               <ul className="list-disc list-inside space-y-1 text-sm">
-                <li>Focus visible en todos los botones y enlaces</li>
-                <li>Modal con focus trap (Tab navega solo dentro del modal)</li>
-                <li>Roles ARIA: button, dialog, menu</li>
-                <li>Navegación por teclado en Weekly Planner (flechas ←/→)</li>
-                <li>Labels apropiados en todos los inputs</li>
+                <li>Focus visible on all buttons and links</li>
+                <li>Modal with focus trap (Tab navigation constrained to the modal)</li>
+                <li>ARIA roles: button, dialog, menu</li>
+                <li>Keyboard navigation in Weekly Planner (←/→ arrows)</li>
+                <li>Appropriate labels on all inputs</li>
               </ul>
             </div>
           </div>
@@ -300,8 +300,8 @@ export function Handoff() {
       {/* Technical Notes */}
       <Card>
         <CardHeader>
-          <CardTitle>Notas Técnicas para Desarrollo</CardTitle>
-          <CardDescription>Ejemplo de comportamiento del modal Add Task</CardDescription>
+          <CardTitle>Technical Notes for Development</CardTitle>
+          <CardDescription>Example behavior for the Add Task modal</CardDescription>
         </CardHeader>
         <CardContent>
           <pre className="bg-muted p-4 rounded-lg text-xs overflow-x-auto">
@@ -342,18 +342,18 @@ const [isAddTaskOpen, setIsAddTaskOpen] = useState(false)
       {/* Summary */}
       <Card className="border-[#7B61FF]">
         <CardHeader>
-          <CardTitle className="text-[#7B61FF]">Resumen de Entrega</CardTitle>
+          <CardTitle className="text-[#7B61FF]">Handoff Summary</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          <p className="text-sm">✅ Header limpio con 3 submenús (Dashboard, Weekly Planner, Task)</p>
-          <p className="text-sm">✅ Botón Add Task grande morado (48x48px) con modal</p>
-          <p className="text-sm">✅ Avatar de usuario con dropdown (Mi perfil, Opciones, Log Out)</p>
-          <p className="text-sm">✅ Dashboard con 4 panels específicos de AI Analysis</p>
-          <p className="text-sm">✅ Weekly Planner sin sidebar lateral</p>
-          <p className="text-sm">✅ Página de Login funcional</p>
-          <p className="text-sm">✅ Submenu "AI Analysis" eliminado</p>
-          <p className="text-sm">✅ Página "Add Task" eliminada (ahora es modal)</p>
-          <p className="text-sm">✅ Componentes documentados y listos para desarrollo</p>
+          <p className="text-sm">✅ Clean header with 3 submenus (Dashboard, Weekly Planner, Tasks)</p>
+          <p className="text-sm">✅ Large purple Add Task button (48x48px) with modal</p>
+          <p className="text-sm">✅ User avatar with dropdown (My profile, Settings, Log Out)</p>
+          <p className="text-sm">✅ Dashboard with 4 AI Analysis-specific panels</p>
+          <p className="text-sm">✅ Weekly Planner without left sidebar</p>
+          <p className="text-sm">✅ Functional Login page</p>
+          <p className="text-sm">✅ "AI Analysis" submenu removed</p>
+          <p className="text-sm">✅ "Add Task" page removed (now a modal)</p>
+          <p className="text-sm">✅ Components documented and ready for development</p>
         </CardContent>
       </Card>
     </div>

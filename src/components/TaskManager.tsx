@@ -17,6 +17,11 @@ export interface TaskForUI {
   classId?: number
   subject: string
   dueDate: string
+  // optional scheduling fields from backend
+  workingDate?: string | null
+  startTime?: string | null
+  endTime?: string | null
+  dueTime?: string | null
   priority: 'High' | 'Medium' | 'Low'
   estimatedTime: number
   description: string
@@ -28,9 +33,10 @@ interface TaskManagerProps {
   userId: number | undefined
   onUpdateTask: (taskId: number | string, updates: Partial<TaskForUI>) => void
   onDeleteTask: (taskId: number | string) => void
+  dataRefreshKey?: number
 }
 
-export function TaskManager({ userId, onUpdateTask, onDeleteTask }: TaskManagerProps) {
+export function TaskManager({ userId, onUpdateTask, onDeleteTask, dataRefreshKey }: TaskManagerProps) {
   const [tasks, setTasks] = useState<TaskForUI[]>([])
   const [classNames, setClassNames] = useState<Record<number, string>>({})
   const [loading, setLoading] = useState(true)
@@ -45,11 +51,30 @@ export function TaskManager({ userId, onUpdateTask, onDeleteTask }: TaskManagerP
     title: task.title,
     classId: task.classId,
     subject: '', // se rellenará luego con la info de la clase
-    dueDate: task.date,
-    priority: (task.priority || 'Low') as 'High' | 'Medium' | 'Low',
+    dueDate: (task as any).dueDate || (task as any).date || '',
+    // keep scheduling fields if present so edit dialog can show them
+    workingDate: (task as any).workingDate ?? (task as any).working_date ?? null,
+    startTime: (task as any).startTime ?? (task as any).start_time ?? null,
+    endTime: (task as any).endTime ?? (task as any).end_time ?? null,
+  dueTime: (task as any).dueTime ?? (task as any).due_time ?? null,
+    // Normalize priority and type casing so filters work regardless of backend casing
+    priority: (() => {
+      const raw = task.priority ?? task.priority
+      if (!raw) return 'Low'
+      const s = String(raw).trim()
+      return (s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()) as 'High' | 'Medium' | 'Low'
+    })(),
     estimatedTime: task.estimatedTime || 0,
     description: task.description || '',
-    type: task.type || 'activity',
+    // Normalize type to one of the allowed values: Homework, Project, Exam
+    type: (() => {
+      const raw = task.type ?? task.type
+      const allowed = ['Homework', 'Project', 'Exam']
+      if (!raw) return 'Homework'
+      const s = String(raw).trim()
+      const normalized = s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
+      return allowed.includes(normalized) ? normalized : 'Homework'
+    })(),
     status: (task.state || 'Pending') as 'Pending' | 'In Progress' | 'Completed',
   })
 
@@ -64,19 +89,47 @@ export function TaskManager({ userId, onUpdateTask, onDeleteTask }: TaskManagerP
       setTasks(mappedTasks)
 
       // ✅ Obtener los nombres de clase para los classId distintos
-      const classIds = Array.from(new Set(
-        data.map(t => t.classId).filter((id): id is number => id !== undefined)
-      ))
-
+      // En lugar de hacer una llamada por cada id (puede producir 404 en backend si la clase no existe),
+      // hacemos una sola petición user-scoped para traer las clases del usuario y construir el mapa.
       const classNamesMap: Record<number, string> = {}
-      await Promise.all(classIds.map(async id => {
-        try {
-          const res = await fetch(APIPATH(`/classes/${id}`))
-          if (!res.ok) return
-          const cls = await res.json()
-          classNamesMap[id] = cls.title
-        } catch {}
-      }))
+      try {
+        const classesRes = await fetch(APIPATH(`/classes/user/${userId}`))
+        if (classesRes.ok) {
+          const classesData: any[] = await classesRes.json()
+          for (const cls of classesData) {
+            if (cls && (cls.id !== undefined && cls.id !== null)) {
+              classNamesMap[Number(cls.id)] = cls.title
+            }
+          }
+        } else {
+          // If the user-scoped endpoint is not available, silently fall back to per-id attempts
+          // (this keeps previous behavior but avoids throwing)
+          const classIds = Array.from(new Set(
+            data.map(t => t.classId).filter((id): id is number => id !== undefined)
+          ))
+          await Promise.all(classIds.map(async id => {
+            try {
+              const res = await fetch(APIPATH(`/classes/${id}`))
+              if (!res.ok) return
+              const cls = await res.json()
+              classNamesMap[id] = cls.title
+            } catch {}
+          }))
+        }
+      } catch (e) {
+        console.warn('Failed to fetch classes for user, falling back to per-id fetches', e)
+        const classIds = Array.from(new Set(
+          data.map(t => t.classId).filter((id): id is number => id !== undefined)
+        ))
+        await Promise.all(classIds.map(async id => {
+          try {
+            const res = await fetch(APIPATH(`/classes/${id}`))
+            if (!res.ok) return
+            const cls = await res.json()
+            classNamesMap[id] = cls.title
+          } catch {}
+        }))
+      }
       setClassNames(classNamesMap)
 
       // ✅ Actualizar subject en cada task
@@ -95,7 +148,7 @@ export function TaskManager({ userId, onUpdateTask, onDeleteTask }: TaskManagerP
 
   useEffect(() => {
     fetchTasks()
-  }, [userId])
+  }, [userId, dataRefreshKey])
 
   const handleStatusChange = async (taskId: number, newStatus: TaskForUI['status']) => {
     try {
@@ -128,9 +181,18 @@ export function TaskManager({ userId, onUpdateTask, onDeleteTask }: TaskManagerP
     setSortBy('dueDate')
   }
 
+  const parseDateVal = (v?: any) => {
+    if (!v) return null
+    if (typeof v === 'string') return v.split('T')[0]
+    if (typeof v === 'object' && v.year && v.month && v.day) return `${v.year}-${String(v.month).padStart(2,'0')}-${String(v.day).padStart(2,'0')}`
+    return String(v).split('T')[0]
+  }
+
   const isOverdue = (task: TaskForUI) => {
     const today = new Date().toISOString().split('T')[0]
-    return task.status !== 'Completed' && task.dueDate < today
+    const due = parseDateVal(task.dueDate)
+    if (!due) return false
+    return task.status !== 'Completed' && due < today
   }
 
   const getPriorityColor = (priority: string) => {
@@ -150,8 +212,14 @@ export function TaskManager({ userId, onUpdateTask, onDeleteTask }: TaskManagerP
     }
   }
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
+  const formatDate = (dateString: string | any) => {
+    const ds = parseDateVal(dateString)
+    if (!ds) return ''
+    // Construct a local date from YYYY-MM-DD to avoid timezone shifts
+    const m = String(ds).match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    let date: Date
+    if (m) date = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+    else date = new Date(String(ds))
     const today = new Date()
     const tomorrow = new Date(today)
     tomorrow.setDate(today.getDate() + 1)
@@ -182,7 +250,18 @@ export function TaskManager({ userId, onUpdateTask, onDeleteTask }: TaskManagerP
     })
     .sort((a, b) => {
       switch (sortBy) {
-        case 'dueDate': return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
+        case 'dueDate': {
+              const dsA = parseDateVal(a.dueDate)
+              const dsB = parseDateVal(b.dueDate)
+              const toTs = (s: any) => {
+                if (!s) return 0
+                const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})$/)
+                if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getTime()
+                const d = new Date(String(s))
+                return isNaN(d.getTime()) ? 0 : d.getTime()
+              }
+              return toTs(dsA) - toTs(dsB)
+            }
         case 'priority':
           const order = { High: 3, Medium: 2, Low: 1 }
           return order[b.priority] - order[a.priority]
@@ -199,7 +278,7 @@ export function TaskManager({ userId, onUpdateTask, onDeleteTask }: TaskManagerP
     <div className="space-y-6">
       <div className="space-y-2">
         <h1 className="text-[#2B2B2B] dark:text-white" style={{ fontSize: '30px', fontWeight: '600' }}>Task Manager</h1>
-        <p className="text-[#555555] dark:text-gray-400" style={{ fontSize: '16px' }}>All your tasks and activities in one place.</p>
+        <p className="text-[#555555] dark:text-gray-400" style={{ fontSize: '16px' }}>All your tasks in one place.</p>
       </div>
 
       {/* Filters and Search */}
@@ -238,8 +317,9 @@ export function TaskManager({ userId, onUpdateTask, onDeleteTask }: TaskManagerP
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="homework">Homework</SelectItem>
-                  <SelectItem value="activity">Activity</SelectItem>
+                  <SelectItem value="Homework">Homework</SelectItem>
+                  <SelectItem value="Project">Project</SelectItem>
+                  <SelectItem value="Exam">Exam</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -249,9 +329,9 @@ export function TaskManager({ userId, onUpdateTask, onDeleteTask }: TaskManagerP
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Priorities</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="High">High</SelectItem>
+                  <SelectItem value="Medium">Medium</SelectItem>
+                  <SelectItem value="Low">Low</SelectItem>
                 </SelectContent>
               </Select>
 

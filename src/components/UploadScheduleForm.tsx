@@ -58,20 +58,16 @@ export function UploadScheduleForm({ onSubmit, onBack, existingClasses }: Upload
   }
 
   const handleSubmit = () => {
-    if (!parentClass) {
-      alert('Please select a class to link this schedule to')
-      return
-    }
-
+    // Parent class is optional for schedule uploads: proceed even if not selected
     const selectedSuggestions = suggestions.filter(s => s.selected)
-    
+
     onSubmit({
-      parentClass,
+      parentClass: parentClass || null,
       suggestions: selectedSuggestions
     })
   }
 
-  if (!showSuggestions) {
+    if (!showSuggestions) {
     return (
       <>
         <DialogHeader>
@@ -80,8 +76,8 @@ export function UploadScheduleForm({ onSubmit, onBack, existingClasses }: Upload
               <ChevronLeft className="w-5 h-5" />
             </Button>
             <div>
-              <DialogTitle>Upload Schedule</DialogTitle>
-              <DialogDescription>Import and analyze your schedule with AI</DialogDescription>
+              <DialogTitle>upload your schedule ics file</DialogTitle>
+              <DialogDescription>Supports only .ics files</DialogDescription>
             </div>
           </div>
         </DialogHeader>
@@ -119,7 +115,7 @@ export function UploadScheduleForm({ onSubmit, onBack, existingClasses }: Upload
           <AIUploadView
             onAnalysisComplete={handleAIAnalysis}
             analysisType="schedule"
-            description="Upload your syllabus, assignment sheet, or schedule"
+            description="Supports only .ics files"
           />
         </div>
       </>
@@ -227,7 +223,8 @@ export function UploadScheduleForm({ onSubmit, onBack, existingClasses }: Upload
             className="bg-[#7B61FF] hover:bg-[#6B51EF]"
             disabled={suggestions.filter(s => s.selected).length === 0}
           >
-            Add {suggestions.filter(s => s.selected).length} Items
+            {/* For schedule uploads, confirm creation of classes */}
+            Create Classes
           </Button>
         </div>
       </div>
