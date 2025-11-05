@@ -28,6 +28,14 @@ export default function App() {
   const [isEditClassesOpen, setIsEditClassesOpen] = useState(false)
   const [showSurvey, setShowSurvey] = useState(true);
 
+  const val_encuesta = [
+    { id: 1, label: 'Nada satisfecho' },
+    { id: 2, label: 'Poco satisfecho' },
+    { id: 3, label: 'Neutral' },
+    { id: 4, label: 'satisfecho' },
+    { id: 5, label: 'mUy satisfecho' },
+  ]
+
   // Dataset/Users - User database with activities and classes
   const [users, setUsers] = useState<User[]>([
     {
@@ -638,23 +646,26 @@ export default function App() {
                     >
                       <X size={20} strokeWidth={2} />
                     </Button>
-                    <h2 className="text-lg font-bold text-purple">
-                      Encuesta rápida
-                    </h2>
-                    <h5 className="text-lg text-purple-800">
+                    <h5 className="text-lg text-purple-800 text-center">
                       ¿Hoy sentí que la aplicación me ayudó a organizar mis tareas de forma personalizada, redujo mi estrés académico, fue fácil de usar y contribuyó positivamente a mejorar mi desempeño?
                     </h5>
-                    <Button
-                      onClick={() => setIsAddEventOpen(true)}
-                      className="gap-2 bg-[#7B61FF] hover:bg-[#6B51EF] text-white shadow-lg rounded-lg px-4"
-                      // style={{ minHeight: '48px', height: '48px' }}
-                      title="Add Task"
-                    >
-                      <MoveRight className="w-5 h-5" />
-                      <span>Enviar</span>
-                    </Button>
                   {/* </div> */}
                 </div>
+              </div>
+              <div className="max-w-7xl mx-auto px-4" style={{height: '50px'}}>
+              <div className="flex items-center justify-center h-full">
+                    {val_encuesta.map((day) => (
+                      <Button
+                        key={day.id}
+                        type="button"
+                        className="gap-2 bg-[#7B61FF] hover:bg-[#6B51EF] text-white shadow-lg rounded-lg left-px-2 mx-2"
+                        size="sm"
+                        onClick={() => {}}
+                      >
+                        {day.label}
+                      </Button>
+                    ))}
+                  </div>
               </div>
             </div>
           </motion.div>
