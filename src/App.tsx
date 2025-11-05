@@ -60,7 +60,7 @@ export default function App() {
       setUserActivities([])
       return
     }
-
+  
     setLoadingUserData(true)
     try {
       const idPart = u.id ? u.id : undefined
@@ -107,6 +107,7 @@ export default function App() {
     } finally {
       setLoadingUserData(false)
     }
+  }
   const [showSurvey, setShowSurvey] = useState(true);
 
   const val_encuesta = [
