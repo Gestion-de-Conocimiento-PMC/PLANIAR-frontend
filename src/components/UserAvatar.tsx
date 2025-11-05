@@ -169,6 +169,27 @@ export function UserAvatar({ user, onLogout, onEditClasses }: UserAvatarProps) {
                 Show Tutorial
               </Button>
             </div>
+            <div className="pt-4 border-t pt-4">
+              <div className="py-2">
+                <p className="text-sm font-semibold">Help us improve</p>
+                <p className="text-xs text-muted-foreground mb-2">Answer this short survey and share your feedback to help us make PLANIAR better.</p>
+                <Button
+                  onClick={() => {
+                    const url = 'https://forms.cloud.microsoft/pages/responsepage.aspx?id=fAS9-kj_KkmLu4-YufucygukQjya5hFOq-iZO0fv-IdUM1Y1RDRSVzhLTVNINzhLRTM4V1pGR01WQS4u&origin=lprLink&route=shorturl'
+                    try {
+                      window.open(url, '_blank', 'noopener')
+                    } catch (e) {
+                      // fallback
+                      window.location.href = url
+                    }
+                    setShowOptions(false)
+                  }}
+                  className="w-full bg-[#7B61FF] text-white"
+                >
+                  Go to survey
+                </Button>
+              </div>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
