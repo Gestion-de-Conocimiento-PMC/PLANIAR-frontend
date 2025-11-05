@@ -37,6 +37,7 @@
             "clsx": "*",
             "cmdk": "^1.1.1",
             "embla-carousel-react": "^8.6.0",
+            "framer-motion": "^12.23.24",
             "input-otp": "^1.4.2",
             "lucide-react": "^0.487.0",
             "next-themes": "^0.4.6",
@@ -63,10 +64,9 @@
             "@swc/core-linux-x64-gnu": "1.13.5"
       },
       "scripts": {
-                  "prebuild": "node -e \"const p=process.platform,a=process.arch; if(p==='linux'&&a==='x64'){ console.log('Installing rollup native binary for',p,a); require('child_process').execSync('npm i -D @rollup/rollup-linux-x64-gnu@4.24.0 --include=optional',{stdio:'inherit'});} else { console.log('Skipping rollup native binary install for',p,a); }\"",
-                  "dev": "node ./node_modules/vite/bin/vite.js",
-                  "build": "node ./node_modules/vite/bin/vite.js build",
-                  "postinstall": "node -e \"try{require('fs').chmodSync('node_modules/.bin/vite',0o755)}catch(e){}\""
+            "prebuild": "node -e \"const p=process.platform,a=process.arch; if(p==='linux'&&a==='x64'){ console.log('Installing rollup native binary for',p,a); require('child_process').execSync('npm i -D @rollup/rollup-linux-x64-gnu@4.24.0 --include=optional',{stdio:'inherit'});} else { console.log('Skipping rollup native binary install for',p,a); }\"",
+            "dev": "node ./node_modules/vite/bin/vite.js",
+            "build": "node ./node_modules/vite/bin/vite.js build",
+            "postinstall": "node -e \"try{require('fs').chmodSync('node_modules/.bin/vite',0o755)}catch(e){}\""
       }
-      
 }

@@ -1,4 +1,5 @@
 import type { MouseEvent, KeyboardEvent } from 'react'
+import React from 'react'
 
 interface ClassBlockProps {
   classData: any

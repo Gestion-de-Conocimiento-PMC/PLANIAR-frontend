@@ -1,3 +1,4 @@
+import React from 'react'
 import { useState } from 'react'
 import { useIsMobile } from '../ui/use-mobile'
 import { Circle, ChevronLeft, ChevronRight, Edit } from 'lucide-react'

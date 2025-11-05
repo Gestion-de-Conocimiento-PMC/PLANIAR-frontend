@@ -1,3 +1,4 @@
+import React from 'react'
 import { useState, useEffect } from 'react'
 import { Calendar, CheckSquare, BarChart3, Plus } from 'lucide-react'
 import { Button } from './components/ui/button'
@@ -16,6 +17,7 @@ import { APIPATH } from './lib/api'
 import { EditClassesDialog } from './components/EditClassesDialog'
 import { User, TaskActivity, ClassItem } from './types'
 import WelcomeTutorial from './components/WelcomeTutorial'
+import SurveyBanner from './components/SurveyBanner'
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
@@ -57,7 +59,7 @@ export default function App() {
       setUserActivities([])
       return
     }
-
+  
     setLoadingUserData(true)
     try {
       const idPart = u.id ? u.id : undefined
@@ -105,6 +107,10 @@ export default function App() {
       setLoadingUserData(false)
     }
   }
+  // Survey is now encapsulated in its own component
+
+  // Dataset/Users - User database with activities and classes
+  // NOTE: test user data removed; app now relies on backend for user/classes/activities
 
   // Class Management (backend-aware)
   const createClass = async (classData: any) => {
@@ -459,13 +465,20 @@ export default function App() {
   const userTasks = userActivities
 
   return (
+
+
+
     <div className="min-h-screen bg-background">
-      {/* Header - Component/Header with official logo */}
+      
+      {/* Survey banner block*/}
+      <>
+  <SurveyBanner userId={user?.id} />
+      </>
       <header className="border-b sticky top-0 z-50 bg-white dark:bg-[#1a1a1a]" style={{ 
         height: '72px',
         boxShadow: '0 2px 6px rgba(0,0,0,0.05)'
       }}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full">
+        <div className="max-w-7xl mx-auto px-1 sm:px-6 lg:px-8 h-full">
           <div className="flex items-center justify-between h-full">
             <div className="flex items-center gap-4" style={{ marginLeft: '24px' }}>
               <button
