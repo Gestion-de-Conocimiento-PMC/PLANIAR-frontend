@@ -34,31 +34,44 @@ export function UploadScheduleForm({ onSubmit, onBack, existingClasses }: Upload
   const [suggestions, setSuggestions] = useState<AISuggestion[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
 
-  const handleAIAnalysis = (aiSuggestions: any) => {
-    // Convert AI suggestions to internal format
-    const formattedSuggestions: AISuggestion[] = (aiSuggestions.items || []).map((item: any, index: number) => ({
+  const handleAIAnalysis = (aiData: any) => {
+    if (!aiData) return
+
+    console.log('✅ AI analysis completed:', aiData)
+
+    // Normaliza los items del análisis
+    const formattedSuggestions: AISuggestion[] = (aiData.items || []).map((item: any, index: number) => ({
       id: `suggestion-${index}`,
-      ...item,
-      selected: true
+      title: item.title || 'Untitled Event',
+      type: item.type || 'class',
+      subject: item.subject || '',
+      days: item.days || [],
+      dateFrom: item.dateFrom || '',
+      dateTo: item.dateTo || '',
+      times: item.times || null,
+      color: item.color || '#7B61FF',
+      selected: true,
     }))
-    
+
+    // Guarda las sugerencias formateadas
     setSuggestions(formattedSuggestions)
+
+    // Muestra la pantalla de revisión
     setShowSuggestions(true)
-    
-    // Auto-select linked class if provided
-    if (aiSuggestions.linkedClass) {
-      setParentClass(aiSuggestions.linkedClass)
+
+    // Si el análisis detectó una clase asociada, selecciónala automáticamente
+    if (aiData.linkedClass) {
+      setParentClass(aiData.linkedClass)
     }
   }
 
   const toggleSuggestion = (id: string) => {
-    setSuggestions(suggestions.map(s => 
+    setSuggestions(suggestions.map(s =>
       s.id === id ? { ...s, selected: !s.selected } : s
     ))
   }
 
   const handleSubmit = () => {
-    // Parent class is optional for schedule uploads: proceed even if not selected
     const selectedSuggestions = suggestions.filter(s => s.selected)
 
     onSubmit({
@@ -67,7 +80,7 @@ export function UploadScheduleForm({ onSubmit, onBack, existingClasses }: Upload
     })
   }
 
-    if (!showSuggestions) {
+  if (!showSuggestions) {
     return (
       <>
         <DialogHeader>
@@ -76,14 +89,14 @@ export function UploadScheduleForm({ onSubmit, onBack, existingClasses }: Upload
               <ChevronLeft className="w-5 h-5" />
             </Button>
             <div>
-              <DialogTitle>upload your schedule ics file</DialogTitle>
+              <DialogTitle>Upload your schedule (.ics)</DialogTitle>
               <DialogDescription>Supports only .ics files</DialogDescription>
             </div>
           </div>
         </DialogHeader>
 
         <div className="mt-4 space-y-6">
-          {/* Link to Class - Required */}
+          {/* Link to Class */}
           <div className="space-y-2">
             <Label>
               Link to Class <span className="text-destructive">*</span>
@@ -116,6 +129,7 @@ export function UploadScheduleForm({ onSubmit, onBack, existingClasses }: Upload
             onAnalysisComplete={handleAIAnalysis}
             analysisType="schedule"
             description="Supports only .ics files"
+            existingClasses={existingClasses} // ✅ nuevo parámetro
           />
         </div>
       </>
@@ -180,8 +194,8 @@ export function UploadScheduleForm({ onSubmit, onBack, existingClasses }: Upload
             <Card
               key={suggestion.id}
               className={`p-4 cursor-pointer transition-all ${
-                suggestion.selected 
-                  ? 'border-[#7B61FF] bg-[#7B61FF]/5' 
+                suggestion.selected
+                  ? 'border-[#7B61FF] bg-[#7B61FF]/5'
                   : 'border-border hover:border-[#7B61FF]/50'
               }`}
               onClick={() => toggleSuggestion(suggestion.id)}
@@ -223,7 +237,6 @@ export function UploadScheduleForm({ onSubmit, onBack, existingClasses }: Upload
             className="bg-[#7B61FF] hover:bg-[#6B51EF]"
             disabled={suggestions.filter(s => s.selected).length === 0}
           >
-            {/* For schedule uploads, confirm creation of classes */}
             Create Classes
           </Button>
         </div>
