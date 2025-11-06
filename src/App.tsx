@@ -38,7 +38,6 @@ export default function App() {
   const [dataRefreshKey, setDataRefreshKey] = useState(0)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
-
   // Global notification event listener so child components can trigger app-styled dialogs
   useEffect(() => {
     const handler = (e: any) => {
@@ -59,7 +58,7 @@ export default function App() {
       setUserActivities([])
       return
     }
-  
+
     setLoadingUserData(true)
     try {
       const idPart = u.id ? u.id : undefined
@@ -345,27 +344,93 @@ export default function App() {
   // Upload Schedule Handler - POST suggestions to backend then refresh
   const handleUploadSchedule = async (scheduleData: any) => {
     if (!user || !scheduleData?.suggestions) return
+    // ensure sanitized is in scope for both try and catch
+    let sanitized: any[] = []
+    // Accept single-suggestion shapes in two forms:
+    // - { suggestion: {...} } (legacy from earlier patches)
+    // - direct object { title, days, startTimes, ... } (preferred)
+    let single: any = null
+    if (scheduleData?.suggestion) single = scheduleData.suggestion
+    else if (scheduleData && (scheduleData.title || scheduleData.days || scheduleData.startTimes)) single = scheduleData
+    if (single) {
+      try {
+        // sanitize title similarly to bulk flow
+        const decodeHtml = (s: string) => {
+          try {
+            if (typeof document !== 'undefined') {
+              const ta = document.createElement('textarea')
+              ta.innerHTML = s || ''
+              return ta.value
+            }
+          } catch (e) {
+            return String(s || '').replace(/&Aacute;/g, 'Á').replace(/&aacute;/g, 'á').replace(/&Ntilde;/g, 'Ñ').replace(/&ntilde;/g, 'ñ').replace(/&Oacute;/g, 'Ó').replace(/&oacute;/g, 'ó').replace(/&Eacute;/g, 'É').replace(/&eacute;/g, 'é')
+          }
+          return String(s || '')
+        }
+        const titleRaw = single.title || single.summary || ''
+        const decoded = decodeHtml(String(titleRaw))
+        const title = decoded.trim() || 'Untitled Class'
+        const sanitizedSingle = { ...single, title }
+        if (sanitizedSingle.type === 'class' || sanitizedSingle.days) await createClass(sanitizedSingle)
+        else await createActivity(sanitizedSingle)
+        await loadUserData(user)
+      } catch (e) {
+        console.error('Failed to create single suggestion', e)
+      }
+      return
+    }
     try {
-      // POST suggestions to backend /schedule or similar endpoint if available
-      const res = await fetch(APIPATH('/schedule/upload'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id ?? user.email, suggestions: scheduleData.suggestions })
+      // sanitize suggestions before sending: ensure title is decoded, trimmed and non-empty
+      const decodeHtml = (s: string) => {
+        try {
+          if (typeof document !== 'undefined') {
+            const ta = document.createElement('textarea')
+            ta.innerHTML = s || ''
+            return ta.value
+          }
+        } catch (e) {
+          // fallback: basic replacements for common entities
+          return String(s || '').replace(/&Aacute;/g, 'Á').replace(/&aacute;/g, 'á').replace(/&Ntilde;/g, 'Ñ').replace(/&ntilde;/g, 'ñ').replace(/&Oacute;/g, 'Ó').replace(/&oacute;/g, 'ó').replace(/&Eacute;/g, 'É').replace(/&eacute;/g, 'é')
+        }
+        return String(s || '')
+      }
+
+      sanitized = (scheduleData.suggestions || []).map((s: any) => {
+        const titleRaw = s.title || s.summary || ''
+        const decoded = decodeHtml(String(titleRaw))
+        const title = decoded.trim() || 'Untitled Class'
+        return { ...s, title }
       })
-      if (!res.ok) {
-        // if endpoint not available, try to individually create classes/activities
-        for (const suggestion of scheduleData.suggestions) {
+      // Instead of attempting a bulk /schedule/upload endpoint, create each suggestion
+      // individually using the same single-class create flow (createClass/createActivity).
+      // This mirrors how the manual Create Class form posts a single class.
+      const creationErrors: any[] = []
+      for (const suggestion of sanitized) {
+        try {
           if (suggestion.type === 'class') await createClass(suggestion)
           else await createActivity(suggestion)
+        } catch (e) {
+          // collect per-item errors but continue creating the rest
+          creationErrors.push({ suggestion, error: e instanceof Error ? e.message : String(e) })
         }
-      } else {
-        await loadUserData(user)
+      }
+      // After attempting creations, reload user data and notify if some failed
+      await loadUserData(user)
+      if (creationErrors.length > 0) {
+        const msg = `${creationErrors.length} items failed to create. See console for details.`
+        window.dispatchEvent(new CustomEvent('planiar:notify', { detail: { message: msg } }))
+        console.warn('handleUploadSchedule: some creations failed', creationErrors)
       }
     } catch (e) {
       console.warn('Upload schedule failed, falling back to individual creation', e)
-      for (const suggestion of scheduleData.suggestions) {
-        if (suggestion.type === 'class') await createClass(suggestion)
-        else await createActivity(suggestion)
+      // Best-effort fallback: try to create each suggestion individually
+      for (const suggestion of sanitized) {
+        try {
+          if (suggestion.type === 'class') await createClass(suggestion)
+          else await createActivity(suggestion)
+        } catch (err) {
+          console.error('Fallback individual creation failed for suggestion', suggestion, err)
+        }
       }
     }
   }
@@ -509,9 +574,9 @@ export default function App() {
                 user={user} 
                 onLogout={handleLogout}
                 onEditClasses={() => {
-                  // When opening from the avatar, explicitly provide the current user's lists
-                  setSelectedClassesForDialog(userClasses)
-                  setSelectedActivitiesForDialog(userTasks)
+                  // Open the manager using the live lists from App (pass null so dialog uses userClasses/userActivities)
+                  setSelectedClassesForDialog(null)
+                  setSelectedActivitiesForDialog(null)
                   setIsEditClassesOpen(true)
                 }}
               />
@@ -525,9 +590,9 @@ export default function App() {
         {/* Welcome tutorial for new users (appears once per user) */}
         {user && (
           <WelcomeTutorial userId={user.id ?? user.email} onCreateClassClick={() => {
-            // Open the Manage dialog where user can create a class
-            setSelectedClassesForDialog(userClasses)
-            setSelectedActivitiesForDialog(userTasks)
+            // Open the Manage dialog where user can create a class (use live lists)
+            setSelectedClassesForDialog(null)
+            setSelectedActivitiesForDialog(null)
             setIsEditClassesOpen(true)
           }} />
         )}
@@ -578,8 +643,9 @@ export default function App() {
                   // If the Schedule/Grid passes undefined (e.g. running in a mode that doesn't provide
                   // the lists) fall back to the current user's lists so the dialog always shows data.
                   console.debug('Schedule requested EditClasses dialog, classes:', classes?.length, 'activities:', activities?.length, 'itemToEdit:', !!itemToEdit)
-                  setSelectedClassesForDialog(classes ?? userClasses)
-                  setSelectedActivitiesForDialog(activities ?? userTasks)
+                  // If caller provided explicit lists, use them; otherwise use live lists by passing null
+                  setSelectedClassesForDialog(classes ?? null)
+                  setSelectedActivitiesForDialog(activities ?? null)
                   setSelectedItemForDialog(itemToEdit ?? null)
                   setIsEditClassesOpen(true)
                 }}
@@ -629,6 +695,7 @@ export default function App() {
         }}
         classes={selectedClassesForDialog ?? userClasses}
         activities={selectedActivitiesForDialog ?? userTasks}
+        dataRefreshKey={dataRefreshKey}
         onEditClass={updateClass}
         onDeleteClass={deleteClass}
         onCreateClass={createClass}

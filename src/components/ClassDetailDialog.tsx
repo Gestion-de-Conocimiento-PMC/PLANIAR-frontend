@@ -10,7 +10,7 @@ interface ClassDetailDialogProps {
   onOpenChange: (open: boolean) => void
   classData: any
   onEdit: () => void
-  onDelete: () => void
+  onDelete: () => Promise<any> | void
 }
 
 const DAYS_MAP: Record<string, string> = {
@@ -32,8 +32,12 @@ export function ClassDetailDialog({
 }: ClassDetailDialogProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
-  const handleDelete = () => {
-    onDelete()
+  const handleDelete = async () => {
+    try {
+      await onDelete()
+    } catch (e) {
+      console.error('ClassDetailDialog.handleDelete error', e)
+    }
     setShowDeleteConfirm(false)
     onOpenChange(false)
   }

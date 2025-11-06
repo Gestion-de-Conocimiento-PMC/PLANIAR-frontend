@@ -5,6 +5,7 @@ import { CreateClassForm } from './CreateClassForm'
 import { CreateActivityForm } from './CreateActivityForm'
 import { CreateTaskFormImproved } from './CreateTaskFormImproved'
 import { UploadScheduleForm } from './UploadScheduleForm'
+import { UploadTasksForm } from './UploadTasksForm'
 
 type EventType = 'class' | 'activity' | 'task' | 'upload' | null
 
@@ -112,7 +113,7 @@ export function AddEventModal({
               </div>
             </button>
 
-            {/* Upload Schedule */}
+            {/* Upload Tasks */}
             <button
               onClick={() => handleOptionClick('upload')}
               className="group relative p-6 border-2 border-border rounded-lg hover:border-[#7B61FF] hover:bg-[#7B61FF]/5 transition-all duration-200 text-left"
@@ -122,9 +123,9 @@ export function AddEventModal({
                   <Upload className="w-8 h-8 text-[#7B61FF]" />
                 </div>
                 <div>
-                  <h3 className="font-medium">Upload Schedule</h3>
+                  <h3 className="font-medium">Upload Tasks</h3>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Import and analyze documents
+                    Upload files (pdf/docx/txt) to extract tasks
                   </p>
                 </div>
               </div>
@@ -181,13 +182,17 @@ export function AddEventModal({
             />
           )}
           {selectedType === 'upload' && (
-            <UploadScheduleForm
-              onSubmit={(data) => {
-                onUploadSchedule(data)
-                handleClose()
-              }}
+            <UploadTasksForm
               onBack={handleBack}
               existingClasses={existingClasses}
+              onCreateTask={(taskData) => {
+                // createTask is handled in parent (App) by passing onCreateTask to AddEventModal
+                if (typeof (onCreateTask as any) === 'function') {
+                  onCreateTask(taskData)
+                }
+                // keep modal open so multiple tasks can be created from the upload; caller may close
+                // If desired, close modal here by uncommenting: handleClose()
+              }}
             />
           )}
         </div>

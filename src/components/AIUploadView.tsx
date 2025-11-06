@@ -36,63 +36,239 @@ export function AIUploadView({ onAnalysisComplete, analysisType, description }: 
 
   const analyzeFile = async (fileToAnalyze: File) => {
     setIsAnalyzing(true)
-    
-    // Simulate AI analysis with different results based on type
-    setTimeout(() => {
-      let suggestions = {}
-      
-      if (analysisType === 'class') {
-        suggestions = {
-          title: 'Advanced Mathematics',
-          days: ['monday', 'wednesday', 'friday'],
-          daySchedule: {
-            monday: { start: '09:00', end: '10:30', room: 'Room 305', professor: 'Dr. Smith' },
-            wednesday: { start: '09:00', end: '10:30', room: 'Room 305', professor: 'Dr. Smith' },
-            friday: { start: '09:00', end: '10:30', room: 'Lab 201', professor: 'Dr. Johnson' }
-          },
-          color: '#3B82F6',
-          dateFrom: '2025-10-01',
-          dateTo: '2025-12-20'
+    const startTs = Date.now()
+    const ensureMin = async (ms: number) => {
+      const diff = Date.now() - startTs
+      if (diff < ms) await new Promise(r => setTimeout(r, ms - diff))
+    }
+    try {
+      if (analysisType === 'schedule') {
+        // parse ICS using ical.js dynamically
+        const text = await fileToAnalyze.text()
+        let ICAL: any = null
+        try {
+          const mod = await import('ical.js')
+          ICAL = mod && (mod.default || mod)
+        } catch (e) {
+          throw new Error("Missing dependency 'ical.js'. Please run 'npm i ical.js' to enable .ics parsing.")
         }
-      } else if (analysisType === 'activity') {
-        suggestions = {
-          title: 'Yoga & Meditation Sessions',
-          days: ['monday', 'wednesday', 'friday'],
-          dayTimes: {
-            monday: { start: '18:00', end: '19:30' },
-            wednesday: { start: '18:00', end: '19:30' },
-            friday: { start: '18:00', end: '19:30' }
-          },
-          description: 'Evening relaxation and mindfulness practice',
-          color: '#10B981'
-        }
-      } else if (analysisType === 'schedule') {
-        suggestions = {
-          linkedClass: 'class-1',
-          items: [
-            {
-              type: 'task',
-              title: 'Math Homework - Chapter 5',
-              subject: 'Mathematics',
-              dueDate: '2025-10-15',
-              priority: 'high',
-              estimatedTime: 90
-            },
-            {
-              type: 'task',
-              title: 'Chemistry Lab Report',
-              subject: 'Chemistry',
-              dueDate: '2025-10-16',
-              priority: 'high',
-              estimatedTime: 120
+
+        const jcalData = ICAL.parse(text)
+        const comp = new ICAL.Component(jcalData)
+        const events = comp.getAllSubcomponents('vevent')
+
+        const items = events.map((ev: any, i: number) => {
+          const vevent = new ICAL.Event(ev)
+          const start = vevent.startDate.toJSDate()
+          const end = vevent.endDate.toJSDate()
+          const title = vevent.summary || vevent.description || 'Untitled Event'
+          const locationRaw = vevent.location || ''
+          // Extract the room after 'Salón:' or 'Salon:' (case-insensitive, accents)
+          let location = ''
+          try {
+            const m = String(locationRaw).match(/Sal[oó]n:\s*([^\n\r]+)/i)
+            if (m && m[1]) location = m[1].trim()
+            else location = locationRaw.toString().trim()
+          } catch (e) {
+            location = locationRaw.toString().trim()
+          }
+          const description = vevent.description || ''
+
+          // Robust instructor extraction: prefer the 'Instructor:' line and parse multiple entries
+          let instructor = ''
+          const descStr = String(description || '')
+
+          // Try to extract the whole Instructor: line first
+          const instLineMatch = descStr.match(/Instructor:\s*([^\n\r]+)/i)
+          if (instLineMatch && instLineMatch[1]) {
+            const instRaw = instLineMatch[1].trim()
+
+            // Simpler pairwise parser: split on escaped commas and pair surname parts with following token(s)
+            const splitParts = instRaw.split(/\\,\s*/)
+            const partsOut: string[] = []
+            let j = 0
+            while (j < splitParts.length - 1) {
+              const rawLast = splitParts[j].replace(/\\n/g, ' ').replace(/\\r/g, ' ').replace(/\\/g, '').trim()
+              let next = splitParts[j + 1]
+              next = next.replace(/\\n/g, ' ').replace(/\\r/g, ' ').trim()
+
+              let firstCandidate = ''
+              let leftover = ''
+              const parenIdx = next.indexOf(')')
+              if (parenIdx !== -1) {
+                const before = next.slice(0, parenIdx + 1).trim()
+                firstCandidate = before
+                leftover = next.slice(parenIdx + 1).trim()
+              } else {
+                const toks = next.split(/\s+/)
+                firstCandidate = toks[0] || ''
+                leftover = toks.slice(1).join(' ')
+              }
+
+              if (leftover) {
+                splitParts[j + 1] = leftover
+              } else {
+                j = j + 1
+              }
+
+              const lastClean = rawLast.replace(/,+$/g, '').trim()
+              let firstClean = firstCandidate.replace(/\([^)]*\)/g, '').trim()
+              const principal = /\(\s*Principal\s*\)/i.test(firstCandidate)
+              const lastParts = lastClean.split(/\s+/).filter(Boolean)
+              const surnameDisplay = (principal && lastParts.length > 1) ? lastParts.slice().reverse().join(' ') : lastClean
+              if (firstClean) partsOut.push(`${firstClean} ${surnameDisplay}`.trim())
+
+              j = j + 1
             }
-          ]
-        }
+
+            if (partsOut.length > 0) instructor = partsOut.join(', ')
+            else instructor = instRaw.replace(/\\/g, '').trim()
+          }
+
+          // Helper to clean common organizer/attendee values and remove emails
+          const cleanName = (raw: any) => {
+            if (!raw) return ''
+            let s = String(raw)
+            // If value contains CN=... extract it
+            const mcn = s.match(/CN=([^:;\n\r]+)/i)
+            if (mcn && mcn[1]) s = mcn[1].trim()
+            // Remove mailto: and email parts
+            s = s.replace(/mailto:/i, '')
+            // If contains ':' separate parts and pick the human-friendly one
+            if (s.includes(':')) {
+              const parts = s.split(':').map(p => p.trim())
+              const candidate = parts.find(p => /[A-Za-zÁÉÍÓÚáéíóúÑñ]/.test(p) && !/@/.test(p))
+              if (candidate) s = candidate
+              else s = parts[0]
+            }
+            // Remove angle-bracket emails and trailing emails
+            s = s.replace(/<[^>]+>/g, '').replace(/\s*[^\s@]+@[^\s@]+\.[^\s@]+/g, '').trim()
+            // Convert "Last, First" -> "First Last"
+            const commaMatch = s.match(/^([^,]+),\s*(.+)$/)
+            if (commaMatch) s = `${commaMatch[2].trim()} ${commaMatch[1].trim()}`
+            return s.trim()
+          }
+
+          // If we didn't get instructor from the Instructor: line, fallback to previous heuristics
+          if (!instructor) {
+            const tryPatterns = [
+              /Instructor:\s*([^\n\r]+)/i,
+              /Profesor?:\s*([^\n\r]+)/i,
+              /Prof:\s*([^\n\r]+)/i,
+              /Docente:\s*([^\n\r]+)/i,
+            ]
+
+            for (const p of tryPatterns) {
+              const mm = descStr.match(p)
+              if (mm && mm[1]) {
+                instructor = mm[1].trim()
+                break
+              }
+            }
+          }
+
+          // If not found yet, try organizer / attendee / summary
+          if (!instructor) {
+            try {
+              const orgVal = (vevent as any).organizer || (ev && typeof ev.getFirstPropertyValue === 'function' && ev.getFirstPropertyValue('organizer'))
+              if (orgVal) instructor = cleanName(orgVal)
+            } catch (e) {
+              // ignore
+            }
+          }
+
+          if (!instructor) {
+            try {
+              const att = (ev && typeof ev.getAllProperties === 'function') ? ev.getAllProperties('attendee') : null
+              if (att && att.length > 0) {
+                for (const a of att) {
+                  const v = typeof a.getParameters === 'function' ? a.getParameters().cn || a.getValue() : (a && a.toString ? a.toString() : '')
+                  const cleaned = cleanName(v)
+                  if (cleaned) { instructor = cleaned; break }
+                }
+              }
+            } catch (e) {
+              // ignore
+            }
+          }
+
+          if (!instructor) {
+            const mparen = String(title || '').match(/\(([^)]+)\)/)
+            if (mparen && mparen[1]) instructor = cleanName(mparen[1])
+          }
+
+          instructor = cleanName(instructor)
+
+          const startDay = start.getDay() // 0=Sun..6=Sat
+          const startTime = start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          const endTime = end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+
+          // Try to detect RRULE in the raw VEVENT text to extract BYDAY and UNTIL
+          let byday: number[] | null = null
+          let untilDateStr: string | null = null
+          try {
+            const rawComp = ev.toString()
+            const rruleMatch = rawComp.match(/RRULE:([^\r\n]+)/i)
+            if (rruleMatch && rruleMatch[1]) {
+              const params = rruleMatch[1].split(';')
+              for (const p of params) {
+                const [k, v] = p.split('=')
+                if (!k || !v) continue
+                const key = k.toUpperCase()
+                if (key === 'BYDAY') {
+                  const codes = v.split(',').map((s: string) => s.trim()).filter(Boolean) as string[]
+                  const map: Record<string, number> = { SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6 }
+                  byday = codes.map((c: string) => map[c] ?? -1).filter((n: number) => n >= 0)
+                }
+                if (key === 'UNTIL') {
+                  // UNTIL often appears as YYYYMMDD or YYYYMMDDTHHMMSSZ
+                  const m = v.match(/^(\d{4})(\d{2})(\d{2})/)
+                  if (m) untilDateStr = `${m[1]}-${m[2]}-${m[3]}`
+                }
+              }
+            }
+          } catch (e) {
+            // ignore parsing errors and fall back to single-event dates
+          }
+
+          return {
+            id: `ics-${i}`,
+            type: 'class',
+            title,
+            summary: title,
+            location,
+            description,
+            instructor,
+            start,
+            end,
+            // prefer BYDAY array when available; otherwise fallback to the start day
+            byday: byday || undefined,
+            day: startDay,
+            startTime,
+            endTime,
+            dateFrom: start.toISOString().slice(0,10),
+            // prefer UNTIL from RRULE when present (end of recurrence series)
+            dateTo: untilDateStr || end.toISOString().slice(0,10),
+          }
+        })
+  await ensureMin(1200)
+        onAnalysisComplete({ items })
+      } else {
+        // keep previous simulated behavior for non-schedule types
+        // ensure the analyzing indicator is visible for at least 900ms for UX
+        setTimeout(async () => {
+          await ensureMin(900)
+          onAnalysisComplete({ items: [] })
+          setIsAnalyzing(false)
+        }, 200)
       }
-      
+    } catch (err: any) {
       setIsAnalyzing(false)
-      onAnalysisComplete(suggestions)
-    }, 2500)
+      onAnalysisComplete({ items: [] })
+      console.error(err)
+    } finally {
+      setIsAnalyzing(false)
+    }
   }
 
   const removeFile = () => {
