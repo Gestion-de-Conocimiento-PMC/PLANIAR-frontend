@@ -18,6 +18,9 @@ export function ClassBlock({ classData, startHour, duration, heightPerHour, onCl
   const height = Math.max(duration * heightPerHour, 60) // Minimum 60px
   const isTouch = useIsTouchDevice()
   const [open, setOpen] = React.useState(false)
+  // Show professor only on sufficiently tall blocks to avoid overcrowding
+  const SHOW_PROFESSOR_MIN_HEIGHT = 90
+  const showProfessor = height >= SHOW_PROFESSOR_MIN_HEIGHT
 
   return (
     <div
@@ -34,7 +37,8 @@ export function ClassBlock({ classData, startHour, duration, heightPerHour, onCl
         minHeight: '60px'
       }}
     >
-      <div className="p-3 h-full flex flex-col justify-center">
+  {/* Ensure nothing spills outside the block; reduce padding for density */}
+  <div className="p-2 h-full flex flex-col justify-center" style={{ overflow: 'hidden' }}>
         {/* Title + info control. On touch devices we open a dialog (better UX for taps); on desktop we keep tooltip. */}
         {isTouch ? (
           <>
@@ -99,20 +103,34 @@ export function ClassBlock({ classData, startHour, duration, heightPerHour, onCl
             </TooltipTrigger>
             <TooltipContent side="top" sideOffset={6} className="tooltip-size p-0">
               <div className="tooltip-scrollable p-2">
-                <div className="font-semibold mb-1">{classData?.title}</div>
-                {classData?.room && <div className="text-sm text-muted-foreground mb-1">Room: {classData.room}</div>}
-                {classData?.professor && <div className="text-sm text-muted-foreground">Prof: {classData.professor}</div>}
-              </div>
+                  <div className="font-semibold mb-1">{classData?.title}</div>
+                  {classData?.room && <div className="text-[0.72rem] text-muted-foreground mb-1">Room: {classData.room}</div>}
+                  {classData?.professor && <div className="text-[0.72rem] text-muted-foreground">Prof: {classData.professor}</div>}
+                </div>
             </TooltipContent>
           </Tooltip>
         )}
         {classData?.room && (
-          <p className="text-xs text-muted-foreground mt-1 leading-tight">
+          <p
+            className="text-xs text-muted-foreground mt-1 leading-tight"
+            style={{
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+            }}
+          >
             {classData.room}
           </p>
         )}
-        {classData?.professor && duration > 1 && (
-          <p className="text-xs text-muted-foreground mt-1 leading-tight">
+        {classData?.professor && showProfessor && (
+          <p
+            className="text-xs text-muted-foreground mt-1 leading-tight"
+            style={{
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+            }}
+          >
             {classData.professor}
           </p>
         )}
