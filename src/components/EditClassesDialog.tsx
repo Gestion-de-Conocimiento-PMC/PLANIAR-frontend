@@ -17,14 +17,16 @@ interface EditClassesDialogProps {
   classes: any[]
   activities?: any[]
   onEditClass: (classId: string, updates: any) => void
-  onDeleteClass: (classId: string) => void
+  onDeleteClass: (classId: string) => Promise<any> | void
   onCreateClass: (classData: any) => void
   onUploadSchedule?: (scheduleData: any) => void
   onEditActivity?: (activityId: string | number, updates: any) => void
-  onDeleteActivity?: (activityId: string | number) => void
+  onDeleteActivity?: (activityId: string | number) => Promise<any> | void
   onCreateActivity?: (activityData: any) => void
   // If provided, when the dialog opens it will immediately show the edit form for this item
   initialEditItem?: any
+  // A numeric key the parent updates after data reloads; used to make the dialog refresh internal state
+  dataRefreshKey?: number
 }
 
 const DAYS_MAP: Record<string, string> = {
@@ -50,7 +52,8 @@ export function EditClassesDialog({
   onEditActivity,
   onDeleteActivity,
   onCreateActivity,
-  initialEditItem
+  initialEditItem,
+  dataRefreshKey
 }: EditClassesDialogProps) {
   // Debug: log incoming data so we can inspect shapes when running locally
   // (This will appear in the browser console.)
@@ -88,7 +91,7 @@ export function EditClassesDialog({
     setIsViewOpen(false)
     setActiveTab('classes')
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [classes, activities, open])
+  }, [classes, activities, open, dataRefreshKey])
 
   // When the dialog opens from the manager button (no initialEditItem provided),
   // reset any internal editing/create state so the dialog always starts on the list view.
@@ -143,9 +146,17 @@ export function EditClassesDialog({
     setDeletingClassId(classId)
   }
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (deletingClassId) {
-      onDeleteClass(deletingClassId)
+      try {
+        // Await parent's delete so the parent can refresh data before we reset local state
+        await onDeleteClass(deletingClassId)
+      } catch (e) {
+        // Ignore - parent will notify user on error
+        console.error('confirmDelete: error from onDeleteClass', e)
+      }
+      // Clear the deleting id so the confirmation dialog closes and the list effect
+      // triggered by parent prop updates can reset internal UI state.
       setDeletingClassId(null)
     }
   }
@@ -735,8 +746,14 @@ export function EditClassesDialog({
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => {
-                if (deletingActivityId && onDeleteActivity) onDeleteActivity(deletingActivityId)
+              onClick={async () => {
+                if (deletingActivityId && onDeleteActivity) {
+                  try {
+                    await onDeleteActivity(deletingActivityId)
+                  } catch (e) {
+                    console.error('Error deleting activity', e)
+                  }
+                }
                 setDeletingActivityId(null)
               }}
               className="bg-destructive hover:bg-destructive/90"
@@ -758,9 +775,16 @@ export function EditClassesDialog({
               else setEditingActivity(normalizeActivityForForm(viewItem))
               setIsViewOpen(false)
           }}
-          onDelete={() => {
-            if (viewItem.itemType === 'class') onDeleteClass && onDeleteClass(viewItem.id)
-            else onDeleteActivity && onDeleteActivity(viewItem.id)
+          onDelete={async () => {
+            try {
+              if (viewItem.itemType === 'class') {
+                if (onDeleteClass) await onDeleteClass(viewItem.id)
+              } else {
+                if (onDeleteActivity) await onDeleteActivity(viewItem.id)
+              }
+            } catch (e) {
+              console.error('Error deleting from viewItem', e)
+            }
             setIsViewOpen(false)
           }}
         />

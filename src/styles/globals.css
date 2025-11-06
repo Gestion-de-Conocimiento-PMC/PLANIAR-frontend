@@ -445,6 +445,31 @@ html {
   }
 }
 
+/* Tooltip / Info modal sizing utilities */
+.tooltip-size {
+  /* default tooltip width (can be overridden by a utility) */
+  max-width: 20rem; /* 320px */
+}
+
+.tooltip-scrollable {
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.info-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  margin-left: 6px;
+  border-radius: 6px;
+}
+
+.info-icon-button:active,
+.info-icon-button:focus {
+  background: rgba(124,58,237,0.06);
+}
+
 /* Today widget highlight styles */
 .today-widget-highlight {
   transition: background-color 200ms ease-out;

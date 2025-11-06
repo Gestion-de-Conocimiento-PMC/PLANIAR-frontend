@@ -7,8 +7,10 @@ import { Label } from './ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
 import { DialogHeader, DialogTitle, DialogDescription } from './ui/dialog'
 import { Badge } from './ui/badge'
+import { Checkbox } from './ui/checkbox'
 import { AIUploadView } from './AIUploadView'
 import { ICS_TUTORIAL_URL } from '../lib/config'
+import ClassEditorModal from './ClassEditorModal'
 
 // Constantes de colores y días de la semana
 const PRESET_COLORS = [
@@ -43,15 +45,41 @@ interface CreateClassFormProps {
 export function CreateClassForm({ onSubmit, onBack, userId, initialData, mode, onUploadSchedule }: CreateClassFormProps) {
   const [title, setTitle] = useState(initialData?.title || '')
   const [selectedDays, setSelectedDays] = useState<number[]>(initialData?.days || [])
+  // Clean instructor values in incoming initialData.daySchedule to remove ICS artifacts
+  const sanitizeInstructor = (raw: any) => {
+    if (!raw) return ''
+    let s = String(raw)
+    s = s.replace(/\\n/g, ' ').replace(/\\r/g, ' ').replace(/\\/g, '')
+    s = s.replace(/\s*\([^)]*\)/g, '').trim()
+    const commaMatch = s.match(/^([^,]+),\s*(.+)$/)
+    if (commaMatch) s = `${commaMatch[2].trim()} ${commaMatch[1].trim()}`
+    return s.trim()
+  }
+
+  const initialDaySchedule: Record<number, { start: string; end: string; room: string; professor: string }> = {}
+  if (initialData?.daySchedule) {
+    Object.entries(initialData.daySchedule).forEach(([k, v]: any) => {
+      const idx = Number(k)
+      if (!isNaN(idx)) {
+        initialDaySchedule[idx] = {
+          start: (v?.start || '').toString(),
+          end: (v?.end || '').toString(),
+          room: (v?.room || '').toString(),
+          professor: sanitizeInstructor(v?.professor || ''),
+        }
+      }
+    })
+  }
+
   const [daySchedule, setDaySchedule] = useState<Record<
     number,
     { start: string; end: string; room: string; professor: string }
-  >>(initialData?.daySchedule || {})
+  >>(initialData?.daySchedule ? initialDaySchedule : {})
   // Helpers for applying same values across selected days
   const [sameProfessorActive, setSameProfessorActive] = useState(false)
   const [sameRoomActive, setSameRoomActive] = useState(false)
   const [sameTimeActive, setSameTimeActive] = useState(false)
-  const [globalProfessor, setGlobalProfessor] = useState(initialData?.professor || '')
+  const [globalProfessor, setGlobalProfessor] = useState(sanitizeInstructor(initialData?.professor || ''))
   const [globalRoom, setGlobalRoom] = useState(initialData?.room || '')
   const [globalStart, setGlobalStart] = useState('')
   const [globalEnd, setGlobalEnd] = useState('')
@@ -64,6 +92,9 @@ export function CreateClassForm({ onSubmit, onBack, userId, initialData, mode, o
   const [inputMode, setInputMode] = useState<'manual' | 'ics'>(isEditMode ? 'manual' : 'manual')
   const [icsSuggestions, setIcsSuggestions] = useState<any[] | null>(null)
   const [showIcsSuggestions, setShowIcsSuggestions] = useState(false)
+  const [formattedSuggestions, setFormattedSuggestions] = useState<any[] | null>(null)
+  const [editorOpen, setEditorOpen] = useState(false)
+  const [editingSuggestion, setEditingSuggestion] = useState<any | null>(null)
 
   const handleDayToggle = (dayId: number) => {
     setSelectedDays((prev) =>
@@ -92,10 +123,109 @@ export function CreateClassForm({ onSubmit, onBack, userId, initialData, mode, o
   }
 
   const handleAIAnalysis = (data: any) => {
-    // Save suggestions from ICS analysis so user can confirm creation
-    // `data` shape: { linkedClass?, items?: [...] }
+    // Convert AI items into grouped suggestions for review
     const items = data?.items || []
+    // normalize helper
+    const normalize = (s: string) => (s || '').toString().normalize('NFD').replace(/\p{Diacritic}/gu, '').replace(/[^a-zA-Z0-9 ]/g, '').toLowerCase().trim()
+
+    // small helper to clean instructor strings coming from ICS (remove escapes, parenthetical qualifiers, and normalize LAST, FIRST)
+    const cleanInstructor = (raw: any) => {
+      if (!raw) return ''
+      let s = String(raw)
+      s = s.replace(/\\n/g, ' ').replace(/\\r/g, ' ')
+      s = s.replace(/\\/g, '')
+      s = s.replace(/\s*\([^)]*\)/g, '')
+      s = s.trim()
+      const commaMatch = s.match(/^([^,]+),\s*(.+)$/)
+      if (commaMatch) s = `${commaMatch[2].trim()} ${commaMatch[1].trim()}`
+      return s.trim()
+    }
+
+    // Display helper — ensure UI never shows ICS artifacts like (Principal) or escaped commas
+    const displayInstructor = (raw: any) => {
+      if (!raw) return ''
+      let s = String(raw)
+      s = s.replace(/\\n/g, ' ').replace(/\\r/g, ' ').replace(/\\/g, '')
+      // remove parenthetical qualifiers
+      s = s.replace(/\s*\([^)]*\)/g, '')
+      s = s.trim()
+      const commaMatch2 = s.match(/^([^,]+),\s*(.+)$/)
+      if (commaMatch2) s = `${commaMatch2[2].trim()} ${commaMatch2[1].trim()}`
+      return s.trim()
+    }
+
+    const groups: Record<string, any> = {}
+    items.forEach((it: any) => {
+      const title = it.title || it.summary || 'Untitled'
+      const norm = normalize(title)
+      const start = it.start ? new Date(it.start) : new Date()
+      const end = it.end ? new Date(it.end) : new Date(start.getTime() + 60 * 60 * 1000)
+      // If parser exposed BYDAY (recurrence days), prefer that list; otherwise fall back to single start day
+      const itemByDays: number[] = Array.isArray(it.byday) && it.byday.length > 0 ? it.byday.map((d: any) => Number(d)) : [ (typeof it.day === 'number' ? it.day : start.getDay()) ]
+      const startTime = it.startTime || start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      const endTime = it.endTime || end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      const room = it.location || ''
+      const professor = cleanInstructor(it.instructor || '')
+      const dateFrom = it.dateFrom || start.toISOString().slice(0,10)
+      const dateTo = it.dateTo || end.toISOString().slice(0,10)
+
+      const baseKey = norm
+      const timeKey = `${startTime}__${endTime}__${room}`
+      if (!groups[baseKey]) groups[baseKey] = {}
+      if (!groups[baseKey][timeKey]) {
+        groups[baseKey][timeKey] = {
+          id: `${baseKey}-${Object.keys(groups[baseKey]).length}`,
+          title,
+          normTitle: norm,
+          days: new Set<number>(),
+          daySchedule: {},
+          rooms: new Set<string>(),
+          professors: new Set<string>(),
+          dateFrom,
+          dateTo,
+          color: '#7B61FF',
+          selected: true,
+        }
+      }
+
+      const g = groups[baseKey][timeKey]
+      // Add all recurrence days for this event (handles RRULE BYDAY)
+      for (const day of itemByDays) {
+        if (typeof day === 'number' && !isNaN(day)) {
+          g.days.add(day)
+          if (!g.daySchedule[day]) g.daySchedule[day] = { start: startTime, end: endTime, room, professor }
+          else {
+            g.daySchedule[day] = { ...g.daySchedule[day], room: g.daySchedule[day].room || room, professor: g.daySchedule[day].professor || professor }
+          }
+        }
+      }
+
+      g.rooms.add(room)
+      if (professor) g.professors.add(professor)
+    })
+
+    const formatted: any[] = []
+    Object.values(groups).forEach((timeMap: any) => {
+      Object.values(timeMap).forEach((g: any) => {
+        const daysArr = Array.from<number>(g.days).sort((a, b) => a - b)
+        formatted.push({
+          id: g.id,
+          title: g.title,
+          type: 'class',
+          subject: '',
+          days: daysArr.map((d: number) => ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d]),
+          dateFrom: g.dateFrom,
+          dateTo: g.dateTo,
+          times: null,
+          color: g.color || '#7B61FF',
+          selected: true,
+          __raw: g,
+        })
+      })
+    })
+
     setIcsSuggestions(items)
+    setFormattedSuggestions(formatted)
     setShowIcsSuggestions(true)
   }
   const handleSubmit = async () => {
@@ -293,31 +423,159 @@ export function CreateClassForm({ onSubmit, onBack, userId, initialData, mode, o
               description="Supports only .ics files"
             />
 
-            {/* After analysis: show suggestions summary and create button */}
-            {showIcsSuggestions && icsSuggestions && (
-              <div className="mt-4 space-y-3">
-                <div className="text-sm text-muted-foreground">Found {icsSuggestions.length} items in the uploaded .ics</div>
-                <div className="flex gap-2">
-                  <Button variant="outline" onClick={() => { setShowIcsSuggestions(false); setIcsSuggestions(null) }}>Cancel</Button>
-                  <Button
-                    onClick={() => {
-                      // Delegate the bulk creation to the parent upload handler if provided
-                      if (typeof onUploadSchedule === 'function') {
-                        onUploadSchedule({ parentClass: null, suggestions: icsSuggestions })
-                      } else if (typeof onSubmit === 'function') {
-                        // fallback: pass through to onSubmit so parent can handle it
-                        onSubmit({ parentClass: null, suggestions: icsSuggestions })
+            {/* After analysis: show editable suggestions list and create buttons */}
+            {showIcsSuggestions && formattedSuggestions && (
+              <>
+                <div className="mt-4 space-y-3">
+                  <div className="text-sm text-muted-foreground">Found {formattedSuggestions.length} items in the uploaded .ics</div>
+
+                  <div className="mt-3 space-y-2 max-h-[40vh] overflow-y-auto pr-2">
+                    {formattedSuggestions.map((suggestion, idx) => {
+                      // helper to convert hex to rgba for light overlay
+                      const hexToRgba = (hex: string, a = 0.12) => {
+                        if (!hex) return `rgba(123,97,255,${a})`
+                        const h = hex.replace('#','')
+                        const bigint = parseInt(h.length === 3 ? h.split('').map(ch=>ch+ch).join('') : h, 16)
+                        const r = (bigint >> 16) & 255
+                        const g = (bigint >> 8) & 255
+                        const b = bigint & 255
+                        return `rgba(${r}, ${g}, ${b}, ${a})`
                       }
-                      // close suggestions view
-                      setShowIcsSuggestions(false)
-                      setIcsSuggestions(null)
-                    }}
-                    className="bg-[#7B61FF] hover:bg-[#6B51EF]"
-                  >
-                    Create Classes
-                  </Button>
+
+                      const selStyle: any = suggestion.selected ? {
+                        borderColor: suggestion.color || '#7B61FF',
+                        boxShadow: `0 6px 18px ${hexToRgba(suggestion.color, 0.12)}`,
+                        backgroundColor: hexToRgba(suggestion.color, 0.06),
+                      } : {}
+
+                      return (
+                        <div key={suggestion.id} className="p-3 border rounded relative" style={selStyle}>
+                          <div className="flex items-start gap-3">
+                            <Checkbox checked={suggestion.selected} onCheckedChange={() => {
+                              setFormattedSuggestions(prev => prev?.map(s => s.id === suggestion.id ? { ...s, selected: !s.selected } : s) || prev)
+                            }} className="mt-1" />
+
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <input value={suggestion.title} onChange={(e) => setFormattedSuggestions(prev => prev?.map(s => s.id === suggestion.id ? { ...s, title: e.target.value } : s) || prev)} className="font-medium bg-transparent focus:outline-none" />
+                                <input type="color" value={suggestion.color || '#7B61FF'} onChange={(e) => setFormattedSuggestions(prev => prev?.map(s => s.id === suggestion.id ? { ...s, color: e.target.value } : s) || prev)} title="Pick color" className="ml-2 w-8 h-6 p-0 border-0" />
+                                {/* Edit button */}
+                                <button onClick={(e)=>{ e.stopPropagation(); setEditingSuggestion(suggestion); setEditorOpen(true) }} title="Edit this detected class" className="ml-auto text-muted-foreground hover:text-foreground">
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5M18.5 2.5a2.121 2.121 0 113 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                  </svg>
+                                </button>
+                              </div>
+
+                              {/* per-day editable details if available */}
+                              {suggestion.__raw?.daySchedule && (
+                                                                <div className="mt-2 text-sm text-muted-foreground space-y-2">
+                                                                  {Object.entries(suggestion.__raw.daySchedule).map(([dayIdx, info]: any) => (
+                                                                    <div key={dayIdx} className="flex items-center gap-4 py-1">
+                                                                      <div className="w-20 text-xs font-medium">{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][Number(dayIdx)]}</div>
+                                                                      <div className="flex-1">{(info.start || '-')}{info.start && info.end ? ` — ${info.end}` : ''} <span className="text-xs text-muted-foreground">@ {info.room || '-'}</span></div>
+                                                                        <div className="w-48 text-sm">Prof: <span className="font-medium">{sanitizeInstructor(info.professor) || '-'}</span></div>
+                                                                    </div>
+                                                                  ))}
+                                                                </div>
+                                                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => { setShowIcsSuggestions(false); setIcsSuggestions(null); setFormattedSuggestions(null) }}>Cancel</Button>
+                    <Button
+                      onClick={async () => {
+                        const selected = formattedSuggestions.filter(s => s.selected)
+                        const payloads = selected.map(s => {
+                          const raw = s.__raw || {}
+                          const daySchedule = raw.daySchedule || {}
+                          const daysFlags: string[] = []
+                          const startTimes: string[] = []
+                          const endTimes: string[] = []
+                          const professors: string[] = []
+                          const rooms: string[] = []
+                          for (let d = 0; d < 7; d++) {
+                            const info = daySchedule[d]
+                            if (info) {
+                              daysFlags.push('1')
+                              startTimes.push(info.start || '')
+                              endTimes.push(info.end || '')
+                              professors.push(info.professor || '')
+                              rooms.push(info.room || '')
+                            } else {
+                              daysFlags.push('0')
+                              startTimes.push('')
+                              endTimes.push('')
+                              professors.push('')
+                              rooms.push('')
+                            }
+                          }
+
+                          return {
+                            title: s.title,
+                            days: daysFlags.join(','),
+                            startTimes: startTimes.join(','),
+                            endTimes: endTimes.join(','),
+                            professor: professors.join(','),
+                            room: rooms.join(','),
+                            startDate: s.dateFrom || raw.dateFrom || null,
+                            endDate: s.dateTo || raw.dateTo || null,
+                            color: s.color || '#7B61FF',
+                          }
+                        })
+
+                        // Create each suggestion individually by calling the parent handler
+                        // once per suggestion. Parent (App) handles both { suggestions: [] }
+                        // and { suggestion } shapes in handleUploadSchedule.
+                        if (typeof onUploadSchedule === 'function') {
+                          for (const p of payloads) {
+                            try {
+                              // eslint-disable-next-line no-await-in-loop
+                              await onUploadSchedule(p)
+                            } catch (err) {
+                              console.error('Failed creating suggestion', p, err)
+                            }
+                          }
+                        } else if (typeof onSubmit === 'function') {
+                          for (const p of payloads) {
+                            try {
+                              // eslint-disable-next-line no-await-in-loop
+                              await onSubmit(p)
+                            } catch (err) {
+                              console.error('Failed creating suggestion via onSubmit', p, err)
+                            }
+                          }
+                        }
+
+                        setShowIcsSuggestions(false)
+                        setIcsSuggestions(null)
+                        setFormattedSuggestions(null)
+                      }}
+                      className="bg-[#7B61FF] hover:bg-[#6B51EF]"
+                    >
+                      Create Classes
+                    </Button>
+                  </div>
                 </div>
-              </div>
+
+                {/* Class editor modal */}
+                {editorOpen && (
+                  <ClassEditorModal
+                    open={editorOpen}
+                    onOpenChange={setEditorOpen}
+                    initial={editingSuggestion}
+                    onSave={(updated) => {
+                      setFormattedSuggestions(prev => prev?.map(s => s.id === updated.id ? { ...s, ...updated } : s) || prev)
+                      setEditingSuggestion(null)
+                    }}
+                  />
+                )}
+              </>
             )}
           </div>
         </TabsContent>
@@ -494,10 +752,10 @@ export function CreateClassForm({ onSubmit, onBack, userId, initialData, mode, o
                             <div className="flex items-center gap-3">
                               <Badge variant="secondary" className="bg-[#7B61FF] text-white">{day?.label}</Badge>
                               <div className="text-sm text-muted-foreground">
-                                { (info.start || info.end) ? `${info.start || ''}${info.start && info.end ? ' - ' : ''}${info.end || ''}` : `${globalStart || ''}${globalStart && globalEnd ? ' - ' : ''}${globalEnd || ''}` }
-                                <div>Prof: {info.professor || globalProfessor}</div>
-                                <div>Room: {info.room || globalRoom}</div>
-                              </div>
+                                      { (info.start || info.end) ? `${info.start || ''}${info.start && info.end ? ' - ' : ''}${info.end || ''}` : `${globalStart || ''}${globalStart && globalEnd ? ' - ' : ''}${globalEnd || ''}` }
+                                      <div>Prof: {sanitizeInstructor(info.professor) || globalProfessor}</div>
+                                      <div>Room: {info.room || globalRoom}</div>
+                                    </div>
                             </div>
                           </div>
                         )
