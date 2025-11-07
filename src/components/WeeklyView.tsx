@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { APIPATH } from '../lib/api'
-import { ChevronLeft, ChevronRight, Circle, Clock, CheckCircle2, AlertCircle } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Circle, Clock, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
 import { Button } from './ui/button'
 import { Card, CardContent } from './ui/card'
 import { Badge } from './ui/badge'
@@ -11,6 +11,7 @@ interface TaskItem {
   title: string
   classId?: number
   date?: string
+  dueDate?: string
   workingDate?: string
   startTime?: string
   endTime?: string
@@ -103,42 +104,42 @@ export function WeeklyView({ userId }: WeeklyViewProps) {
   const isToday = (date: Date) => date.toDateString() === new Date().toDateString()
 
   // Fetch tasks and activities
-  useEffect(() => {
+  const fetchData = async () => {
     if (!userId) return
-
-    const fetchData = async () => {
-      setLoading(true)
-      try {
-        // Fetch all tasks for the user and filter client-side by workingDate or due date
-        const tRes = await fetch(APIPATH(`/tasks/user/${userId}`))
-        if (tRes.ok) {
-          const allTasks: TaskItem[] = await tRes.json()
-          setTasks(allTasks)
-        } else {
-          setTasks([])
-        }
-      } catch (err) {
-        console.error('Error fetching tasks:', err)
+    setLoading(true)
+    try {
+      // Fetch all tasks for the user and filter client-side by workingDate or due date
+      const tRes = await fetch(APIPATH(`/tasks/user/${userId}`))
+      if (tRes.ok) {
+        const allTasks: TaskItem[] = await tRes.json()
+        setTasks(allTasks)
+      } else {
         setTasks([])
       }
-
-      try {
-        const aRes = await fetch(APIPATH(`/activities/user/${userId}`))
-        if (aRes.ok) {
-          const allActivities: ActivityItem[] = await aRes.json()
-          setActivities(allActivities)
-        } else {
-          setActivities([])
-        }
-      } catch (err) {
-        console.error('Error fetching activities:', err)
-        setActivities([])
-      }
-      setLoading(false)
+    } catch (err) {
+      console.error('Error fetching tasks:', err)
+      setTasks([])
     }
 
-    fetchData()
-  }, [userId, currentWeek])
+    try {
+      const aRes = await fetch(APIPATH(`/activities/user/${userId}`))
+      if (aRes.ok) {
+        const allActivities: ActivityItem[] = await aRes.json()
+        setActivities(allActivities)
+      } else {
+        setActivities([])
+      }
+    } catch (err) {
+      console.error('Error fetching activities:', err)
+      setActivities([])
+    }
+    setLoading(false)
+  }
+
+  useEffect(() => { fetchData() }, [userId, currentWeek])
+
+  // refreshing controls button spinner state
+  const [refreshing, setRefreshing] = useState(false)
 
   // Scroll automatically to today's day
   useEffect(() => {
@@ -268,6 +269,143 @@ export function WeeklyView({ userId }: WeeklyViewProps) {
   // whether the refresh action is available (admins always have it)
   const isRefreshAvailable = userRole !== 'user' || refreshCount > 0
 
+  // Try to read user availability from local cache or backend; return null if none found
+  const getAvailableHours = async (): Promise<Record<string, string[]> | null> => {
+    if (!userId) return null
+
+    // Prefer local cached user object if present (less chatty)
+    try {
+      const raw = localStorage.getItem('planiar_user')
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (parsed && parsed.availableHours && typeof parsed.availableHours === 'object') return parsed.availableHours
+      }
+    } catch (e) {
+      // ignore parse errors and proceed to network
+    }
+
+    // Try the canonical user endpoint first, then fallbacks
+    const candidates = [
+      APIPATH(`/users/${userId}`),
+      APIPATH(`/users/${userId}/availability`),
+      APIPATH(`/users/${userId}/preferences`),
+      APIPATH(`/users/${userId}/settings`)
+    ]
+
+    for (const url of candidates) {
+      try {
+        const r = await fetch(url)
+        if (!r.ok) continue
+        const body = await r.json()
+        if (!body) continue
+        // Common shapes: { availableHours: { MON: [...] } } or direct map { MON: [...] }
+        if (body.availableHours && typeof body.availableHours === 'object') return body.availableHours
+        if (body.available_hours && typeof body.available_hours === 'object') return body.available_hours
+        if (typeof body === 'object') {
+          const keys = Object.keys(body)
+          const dayKeys = ['MON','TUE','WED','THU','FRI','SAT','SUN']
+          if (keys.some(k => dayKeys.includes(k.toUpperCase()))) {
+            // Normalize keys to upper-case day codes
+            const normalized: Record<string, string[]> = {}
+            for (const kk of keys) {
+              const upper = kk.toUpperCase()
+              if (dayKeys.includes(upper) && Array.isArray((body as any)[kk])) normalized[upper] = (body as any)[kk]
+            }
+            if (Object.keys(normalized).length > 0) return normalized
+          }
+        }
+      } catch (e) {
+        // ignore and try next
+      }
+    }
+    return null
+  }
+
+  // Handler to call backend AI planning and apply returned schedule
+  const handleRefreshPlan = async () => {
+    if (!userId) {
+      window.dispatchEvent(new CustomEvent('planiar:notify', { detail: { message: 'User not signed in' } }))
+      return
+    }
+
+    if (userRole === 'user' && refreshCount <= 0) {
+      window.dispatchEvent(new CustomEvent('planiar:notify', { detail: { message: 'No refreshes left for this month' } }))
+      return
+    }
+
+    try {
+      setLoading(true)
+      setRefreshing(true)
+
+      // Build a payload matching backend DTO: { userId, tasks, availableHours }
+      const payloadTasks = tasks.map(t => ({
+        id: t.id,
+        title: t.title,
+        classId: t.classId ?? null,
+        dueDate: t.dueDate ?? t.date ?? null,
+        dueTime: (t as any).dueTime ?? null,
+        priority: t.priority ?? null,
+        estimatedTime: t.estimatedTime ?? null,
+        description: t.description ?? null,
+        type: t.type ?? null,
+        state: t.state ?? null
+      }))
+
+      // Try to read real availability from backend; fall back to reasonable defaults
+      let availableHours = await getAvailableHours()
+      if (!availableHours) {
+        availableHours = {
+          MON: ['08:00-20:00'],
+          TUE: ['08:00-20:00'],
+          WED: ['08:00-20:00'],
+          THU: ['08:00-20:00'],
+          FRI: ['08:00-20:00'],
+          SAT: [],
+          SUN: []
+        }
+      }
+
+      const resp = await fetch(APIPATH('/ai/refresh-plan'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, tasks: payloadTasks, availableHours })
+      })
+
+      if (!resp.ok) throw new Error('AI planning failed')
+
+      const planned: any[] = await resp.json()
+
+      // Update local tasks with returned planning. The backend returns Task objects; map them into our TaskItem shape.
+      const mappedPlanned: TaskItem[] = planned.map(p => ({
+        id: p.id,
+        title: p.title,
+        classId: p.classId ?? p.class_id ?? undefined,
+        date: p.date ?? p.dueDate ?? p.due_date ?? undefined,
+        workingDate: p.workingDate ?? p.working_date ?? null,
+        startTime: p.startTime ?? p.start_time ?? null,
+        endTime: p.endTime ?? p.end_time ?? null,
+        priority: p.priority ?? undefined,
+        estimatedTime: p.estimatedTime ?? p.estimated_time ?? undefined,
+        description: p.description ?? undefined,
+        type: p.type ?? undefined,
+        state: p.state ?? p.status ?? undefined,
+        subject: p.subject ?? undefined
+      }))
+
+      // Prefer backend as source of truth: reload tasks after planning
+      await fetchData()
+      // Consume one refresh for regular users
+      if (userRole === 'user') setRefreshCount(c => Math.max(0, c - 1))
+      window.dispatchEvent(new CustomEvent('planiar:notify', { detail: { message: 'Plan refreshed' } }))
+    } catch (err) {
+      console.error('Error refreshing plan:', err)
+      window.dispatchEvent(new CustomEvent('planiar:notify', { detail: { message: 'Error refreshing plan' } }))
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
+    }
+  }
+
   return (
     <>
       {/* Header */}
@@ -350,21 +488,10 @@ export function WeeklyView({ userId }: WeeklyViewProps) {
             <Button
               size="sm"
               className={`gap-2 ${isRefreshAvailable ? 'bg-[#7C3AED] hover:bg-[#6D28D9] text-white border-0 w-full lg:w-auto' : 'border-[#7B61FF] text-[#7B61FF] bg-white w-full lg:w-auto'}`}
-              onClick={() => {
-                if (userRole !== 'user') {
-                  window.dispatchEvent(new CustomEvent('planiar:notify', { detail: { message: 'Unlimited refreshes for your role' } }))
-                  return
-                }
-                if (refreshCount <= 0) {
-                  window.dispatchEvent(new CustomEvent('planiar:notify', { detail: { message: 'No refreshes left for this month' } }))
-                  return
-                }
-                setRefreshCount(c => c - 1)
-                window.dispatchEvent(new CustomEvent('planiar:notify', { detail: { message: 'Plan refreshed (simulated)' } }))
-              }}
-              disabled={!isRefreshAvailable}
+              onClick={handleRefreshPlan}
+              disabled={!isRefreshAvailable || refreshing}
             >
-              <span>Refresh my plan</span>
+              {refreshing ? <><Loader2 className="w-4 h-4 animate-spin" /> <span>Refreshing...</span></> : <span>Refresh my plan</span>}
               <Badge className="ml-2">{userRole === 'user' ? `${refreshCount}/${maxRefreshCount}` : '∞'}</Badge>
             </Button>
           </div>
