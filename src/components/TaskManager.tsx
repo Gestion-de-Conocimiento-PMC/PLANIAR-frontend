@@ -39,6 +39,7 @@ interface TaskManagerProps {
 export function TaskManager({ userId, onUpdateTask, onDeleteTask, dataRefreshKey }: TaskManagerProps) {
   const [tasks, setTasks] = useState<TaskForUI[]>([])
   const [classNames, setClassNames] = useState<Record<number, string>>({})
+  const [existingClasses, setExistingClasses] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
@@ -96,6 +97,7 @@ export function TaskManager({ userId, onUpdateTask, onDeleteTask, dataRefreshKey
         const classesRes = await fetch(APIPATH(`/classes/user/${userId}`))
         if (classesRes.ok) {
           const classesData: any[] = await classesRes.json()
+          setExistingClasses(classesData || [])
           for (const cls of classesData) {
             if (cls && (cls.id !== undefined && cls.id !== null)) {
               classNamesMap[Number(cls.id)] = cls.title
@@ -423,7 +425,7 @@ export function TaskManager({ userId, onUpdateTask, onDeleteTask, dataRefreshKey
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
-                            <TaskEditDialog task={task} onUpdateTask={handleUpdateTask}>
+                            <TaskEditDialog task={task} onUpdateTask={handleUpdateTask} existingClasses={existingClasses}>
                               <Button variant="ghost" size="sm"><Edit className="w-4 h-4" /></Button>
                             </TaskEditDialog>
                             <AlertDialog>
@@ -457,7 +459,7 @@ export function TaskManager({ userId, onUpdateTask, onDeleteTask, dataRefreshKey
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-start gap-2 flex-1 min-w-0">{getStatusIcon(task.status)}<div className="flex-1 min-w-0"><h4 className="font-medium break-words">{task.title}</h4><p className="text-sm text-muted-foreground">{task.subject}</p></div></div>
                         <div className="flex items-center gap-1 flex-shrink-0">
-                          <TaskEditDialog task={task} onUpdateTask={onUpdateTask}><Button variant="ghost" size="sm" style={{ minWidth: '44px', minHeight: '44px' }}><Edit className="w-4 h-4" /></Button></TaskEditDialog>
+                          <TaskEditDialog task={task} onUpdateTask={onUpdateTask} existingClasses={existingClasses}><Button variant="ghost" size="sm" style={{ minWidth: '44px', minHeight: '44px' }}><Edit className="w-4 h-4" /></Button></TaskEditDialog>
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <Button variant="ghost" size="sm" className="text-red-600" style={{ minWidth: '44px', minHeight: '44px' }}><Trash2 className="w-4 h-4" /></Button>

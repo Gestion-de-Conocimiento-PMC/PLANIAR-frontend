@@ -15,6 +15,7 @@ interface TaskEditDialogProps {
   onUpdateTask?: (taskId: number | string, updates: Partial<TaskForUI>) => void
   children?: React.ReactNode
   onRefresh?: () => void
+  existingClasses?: any[]
 }
 
 interface FormData {
@@ -27,7 +28,7 @@ interface FormData {
   state: 'Pending' | 'In Progress' | 'Completed'
 }
 
-export function TaskEditDialog({ task, onUpdateTask, children, onRefresh }: TaskEditDialogProps) {
+export function TaskEditDialog({ task, onUpdateTask, children, onRefresh, existingClasses }: TaskEditDialogProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [formData, setFormData] = useState<FormData>({
     title: '',
@@ -38,6 +39,8 @@ export function TaskEditDialog({ task, onUpdateTask, children, onRefresh }: Task
     description: '',
     state: 'Pending'
   })
+  // selectedClassId is stored as a string; 'none' means General / No class
+  const [selectedClassId, setSelectedClassId] = useState<string>('none')
   // advanced scheduling fields (hidden by default)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [workingDate, setWorkingDate] = useState('')
@@ -47,9 +50,13 @@ export function TaskEditDialog({ task, onUpdateTask, children, onRefresh }: Task
 
   useEffect(() => {
     if (task) {
+      // initialize form and selected class id (use 'none' when no class)
+      const initialClassId = (task as any).classId !== undefined && (task as any).classId !== null ? String((task as any).classId) : 'none'
+      setSelectedClassId(initialClassId)
       setFormData({
         title: task.title || '',
-        subject: task.subject || '',
+        // subject will be synced from selectedClassId in an effect below
+        subject: task.subject || (initialClassId === 'none' ? 'General' : ''),
         date: (task as any).dueDate || (task as any).date || '',
         priority: task.priority || 'Medium',
         estimatedTime: task.estimatedTime || 60,
@@ -94,20 +101,32 @@ export function TaskEditDialog({ task, onUpdateTask, children, onRefresh }: Task
     }
   }, [task])
 
+  // keep the textual subject in sync with the selected class
+  useEffect(() => {
+    if (!existingClasses || existingClasses.length === 0) return
+    if (selectedClassId === 'none') {
+      setFormData(prev => ({ ...prev, subject: 'General' }))
+      return
+    }
+    const cls = existingClasses.find(c => String(c.id) === String(selectedClassId))
+    if (cls) setFormData(prev => ({ ...prev, subject: cls.title || '' }))
+  }, [selectedClassId, existingClasses])
+
   const handleInputChange = <K extends keyof FormData>(field: K, value: FormData[K]) => {
     setFormData(prev => ({ ...prev, [field]: value }))
   }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    if (!formData.title.trim() || !formData.subject.trim() || !formData.date) return
+    // require title and date; class may be 'none' (General) or a selected class
+    if (!formData.title.trim() || !formData.date) return
 
     try {
       // Build payload including scheduling fields. If advanced editing is off,
       // include the existing scheduling values so they are preserved on update.
-      const payload: any = {
-        title: formData.title,
-        classId: task.classId,
+  const payload: any = {
+  title: formData.title,
+  classId: selectedClassId && selectedClassId !== 'none' ? Number(selectedClassId) : null,
         type: "Homework",
         // send backend field dueDate
         dueDate: formData.date,
@@ -201,12 +220,29 @@ export function TaskEditDialog({ task, onUpdateTask, children, onRefresh }: Task
 
                 <div className="space-y-2">
                   <Label htmlFor="subject">Subject/Category *</Label>
-                  <Input
-                    id="subject"
-                    value={formData.subject}
-                    onChange={e => handleInputChange('subject', e.target.value)}
-                    required
-                  />
+                  {existingClasses && existingClasses.length > 0 ? (
+                    <Select value={String(selectedClassId ?? '')} onValueChange={v => setSelectedClassId(v)}>
+                      <SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger>
+                      <SelectContent>
+                          <SelectItem value="none">General / No class</SelectItem>
+                          {existingClasses.map(c => (
+                            <SelectItem key={c.id} value={String(c.id)}>
+                              <div className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: c.color }} />
+                                <div>{c.title}</div>
+                              </div>
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Input
+                      id="subject"
+                      value={formData.subject}
+                      onChange={e => handleInputChange('subject', e.target.value)}
+                      required
+                    />
+                  )}
                 </div>
 
                 <div className="space-y-2">
