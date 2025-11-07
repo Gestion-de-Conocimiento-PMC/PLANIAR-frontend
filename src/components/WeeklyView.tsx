@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { APIPATH } from '../lib/api'
-import { ChevronLeft, ChevronRight, Circle, Clock, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Circle, Clock, CheckCircle2, AlertCircle, Loader2, Check } from 'lucide-react'
 import { Button } from './ui/button'
 import { Card, CardContent } from './ui/card'
 import { Badge } from './ui/badge'
@@ -140,6 +140,8 @@ export function WeeklyView({ userId }: WeeklyViewProps) {
 
   // refreshing controls button spinner state
   const [refreshing, setRefreshing] = useState(false)
+  const [refreshSuccess, setRefreshSuccess] = useState(false)
+  const successTimerRef = useRef<number | null>(null)
 
   // Scroll automatically to today's day
   useEffect(() => {
@@ -396,15 +398,32 @@ export function WeeklyView({ userId }: WeeklyViewProps) {
       await fetchData()
       // Consume one refresh for regular users
       if (userRole === 'user') setRefreshCount(c => Math.max(0, c - 1))
+      // show transient success UI (checkmark) instead of loader
+      setRefreshing(false)
+      setRefreshSuccess(true)
+      // clear any existing timer
+      if (successTimerRef.current) window.clearTimeout(successTimerRef.current)
+      successTimerRef.current = window.setTimeout(() => {
+        setRefreshSuccess(false)
+        successTimerRef.current = null
+      }, 2000)
       window.dispatchEvent(new CustomEvent('planiar:notify', { detail: { message: 'Plan refreshed' } }))
     } catch (err) {
       console.error('Error refreshing plan:', err)
       window.dispatchEvent(new CustomEvent('planiar:notify', { detail: { message: 'Error refreshing plan' } }))
     } finally {
       setLoading(false)
-      setRefreshing(false)
+      // if not already cleared by success branch
+      if (!refreshSuccess) setRefreshing(false)
     }
   }
+
+  // cleanup success timer on unmount
+  useEffect(() => {
+    return () => {
+      if (successTimerRef.current) window.clearTimeout(successTimerRef.current)
+    }
+  }, [])
 
   return (
     <>
@@ -489,9 +508,15 @@ export function WeeklyView({ userId }: WeeklyViewProps) {
               size="sm"
               className={`gap-2 ${isRefreshAvailable ? 'bg-[#7C3AED] hover:bg-[#6D28D9] text-white border-0 w-full lg:w-auto' : 'border-[#7B61FF] text-[#7B61FF] bg-white w-full lg:w-auto'}`}
               onClick={handleRefreshPlan}
-              disabled={!isRefreshAvailable || refreshing}
+              disabled={!isRefreshAvailable || refreshing || refreshSuccess}
             >
-              {refreshing ? <><Loader2 className="w-4 h-4 animate-spin" /> <span>Refreshing...</span></> : <span>Refresh my plan</span>}
+              {refreshing ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> <span>Refreshing...</span></>
+              ) : refreshSuccess ? (
+                <><Check className="w-4 h-4 text-green-200" /> <span>Refreshed</span></>
+              ) : (
+                <span>Refresh my plan</span>
+              )}
               <Badge className="ml-2">{userRole === 'user' ? `${refreshCount}/${maxRefreshCount}` : '∞'}</Badge>
             </Button>
           </div>

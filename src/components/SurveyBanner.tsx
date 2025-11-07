@@ -120,65 +120,66 @@ const SurveyBanner: React.FC<SurveyBannerProps> = ({ userId }) => {
   return (
     <div key="survey" className="overflow-hidden bg-purple-100 border-b border-purple-300 transition-all duration-300 ease-in-out">
       <div
-        className=" mx-auto px-4"
+        className="mx-auto px-4 py-3 md:py-4"
         style={{
           overflow: 'hidden',
           background:
             'linear-gradient(90deg, rgba(134,110,255,0.95) 0%, rgba(255,255,255,0.0) 10%, rgba(255,255,255,0.0) 90%, rgba(134,110,255,0.95) 100%)'
         }}
       >
-        <div className="max-w-7xl mx-auto px-4" style={{ height: '85px' }}>
-          <div className="flex items-center justify-center h-full relative">
+        <div className="max-w-7xl mx-auto px-2 md:px-4">
+          <div className="flex items-center justify-center relative">
             <Button
               onClick={() => setShowSurvey(false)}
-              className="absolute left-2 top-2 text-gray-500 hover:text-gray-700 transition-colors rounded-md p-1 z-10"
+              className="absolute left-2 top-2 text-gray-500 hover:text-gray-700 transition-colors rounded-md p-2 z-10"
               title="Cerrar encuesta"
               style={{ background: 'transparent', boxShadow: 'none', minHeight: 'auto', height: 'auto' }}
             >
-              <X size={20} strokeWidth={2} />
+              <X size={18} strokeWidth={2} />
             </Button>
-            <h5 className="text-lg text-purple-800 text-center max-w-4xl mx-auto px-4">
+            <h5 className="text-sm md:text-base lg:text-lg text-purple-800 text-center max-w-full md:max-w-4xl mx-auto px-2 leading-tight font-bold">
               Hoy me resultó fácil usar la aplicación para organizar mis tareas y contribuyo positivamente a mejorar mi desempeño.
             </h5>
           </div>
-        </div>
-        <div className="max-w-7xl mx-auto px-4" style={{ height: '70px' }}>
-          <div className="max-w-xl mx-auto">
-            {/* Numbers row */}
-            <div className="flex text-center text-sm font-semibold mb-1">
-              {Array.from({ length: 7 }).map((_, i) => (
-                <div key={i} className="flex-1 select-none">
-                  {7 - i}
-                </div>
-              ))}
-            </div>
 
-            {/* Color bar with 7 selectable segments laid out horizontally */}
-            <div className="flex rounded-md overflow-hidden flex-nowrap" role="radiogroup" aria-label="Encuesta de satisfacción">
-              {colors.map((c, idx) => {
-                const value = 7 - idx
-                const selected = surveyValue === value
-                return (
-                  <button
-                    key={idx}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    onClick={() => submitAnswer(value)}
-                    className={`flex-1 h-5 focus:outline-none transform transition duration-150 ease-out hover:scale-105 hover:shadow-lg ${idx === 0 ? 'rounded-l-md' : ''} ${idx === 6 ? 'rounded-r-md' : ''} relative`}
-                    style={{ backgroundColor: c, minWidth: 0 }}
-                    title={`${value} - ${idx === 0 ? 'Nada satisfecho' : idx === 6 ? 'Muy satisfecho' : ''}`}
-                  >
-                    {selected && <span className="absolute inset-0 ring-2 ring-white/60" aria-hidden />}
-                  </button>
-                )
-              })}
-            </div>
+          <div className="mt-3 md:mt-4">
+            <div className="max-w-lg mx-auto">
+              {/* Numbers row */}
+              <div className="flex text-center text-xs md:text-sm font-semibold mb-2">
+                {Array.from({ length: 7 }).map((_, i) => (
+                  <div key={i} className="flex-1 select-none">
+                    {7 - i}
+                  </div>
+                ))}
+              </div>
 
-            {/* Labels below bar - added extra bottom spacing */}
-            <div className="flex justify-between text-xs mt-3 mb-4 font-bold text-purple-800">
-              <div>Totalmente en desacuerdo</div>
-              <div>Totalmente de acuerdo</div>
+              {/* Color bar with 7 selectable segments laid out horizontally */}
+              <div className="flex rounded-md overflow-hidden flex-nowrap" role="radiogroup" aria-label="Encuesta de satisfacción">
+                {colors.map((c, idx) => {
+                  const value = 7 - idx
+                  const selected = surveyValue === value
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      onClick={() => submitAnswer(value)}
+                      className={`flex-1 h-6 lg:h-5 focus:outline-none transform transition duration-150 ease-out hover:scale-105 hover:shadow-lg ${idx === 0 ? 'rounded-l-md' : ''} ${idx === 6 ? 'rounded-r-md' : ''} relative`}
+                      style={{ backgroundColor: c, minWidth: 0 }}
+                      title={`${value} - ${idx === 0 ? 'Nada satisfecho' : idx === 6 ? 'Muy satisfecho' : ''}`}
+                    >
+                      {selected && <span className="absolute inset-0 ring-2 ring-white/60" aria-hidden />}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Labels below bar - added extra bottom spacing */}
+              <div className="flex justify-between text-xs md:text-sm mt-3 md:mt-4 mb-2 md:mb-4 font-bold text-purple-800">
+                <div className="max-w-[45%] truncate">Totalmente en desacuerdo</div>
+                <div className="max-w-[45%] text-right truncate">Totalmente de acuerdo</div>
+              </div>
             </div>
           </div>
         </div>
