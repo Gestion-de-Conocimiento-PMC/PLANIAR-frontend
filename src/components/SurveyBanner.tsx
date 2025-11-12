@@ -26,7 +26,7 @@ const SurveyBanner: React.FC<SurveyBannerProps> = ({ userId }) => {
     // try to POST to backend if userId available
     if (!userId) {
       // no user id: just close and notify
-      window.dispatchEvent(new CustomEvent('planiar:notify', { detail: { message: 'Respuesta guardada localmente (usuario no identificado).' } }))
+      window.dispatchEvent(new CustomEvent('planiar:notify', { detail: { message: 'Answer saved locally (no user).' } }))
       setTimeout(() => setShowSurvey(false), 200)
       return
     }
@@ -39,7 +39,7 @@ const SurveyBanner: React.FC<SurveyBannerProps> = ({ userId }) => {
         body: JSON.stringify({ answer: value })
       })
       if (res.ok) {
-        window.dispatchEvent(new CustomEvent('planiar:notify', { detail: { message: 'Gracias por contestar la encuesta.' } }))
+        window.dispatchEvent(new CustomEvent('planiar:notify', { detail: { message: 'Thank you for answering the survey.' } }))
         // persist a quick marker locally to avoid re-showing immediately
         try {
           const today = new Date()
@@ -51,7 +51,7 @@ const SurveyBanner: React.FC<SurveyBannerProps> = ({ userId }) => {
           localStorage.setItem(key, todayISO)
         } catch (e) {}
       } else {
-        let errMsg = 'No se pudo guardar la respuesta.'
+  let errMsg = 'No se pudo guardar la respuesta. / Could not save the answer.'
         try {
           const body = await res.json()
           errMsg = body?.error || body?.message || errMsg
@@ -59,7 +59,7 @@ const SurveyBanner: React.FC<SurveyBannerProps> = ({ userId }) => {
         window.dispatchEvent(new CustomEvent('planiar:notify', { detail: { message: errMsg } }))
       }
     } catch (e: any) {
-      window.dispatchEvent(new CustomEvent('planiar:notify', { detail: { message: 'Error al enviar la encuesta: ' + (e?.message || e) } }))
+  window.dispatchEvent(new CustomEvent('planiar:notify', { detail: { message:'Error sending survey: ' + (e?.message || e) } }))
     } finally {
       // show a brief selection feedback then close
       setTimeout(() => setShowSurvey(false), 250)
@@ -137,9 +137,11 @@ const SurveyBanner: React.FC<SurveyBannerProps> = ({ userId }) => {
             >
               <X size={18} strokeWidth={2} />
             </Button>
-            <h5 className="text-sm md:text-base lg:text-lg text-purple-800 text-center max-w-full md:max-w-4xl mx-auto px-2 leading-tight font-bold">
-              Hoy me resultó fácil usar la aplicación para organizar mis tareas y contribuyo positivamente a mejorar mi desempeño.
-            </h5>
+            <div className="text-center max-w-full md:max-w-4xl mx-auto px-2 leading-tight">
+              <h5 className="text-sm md:text-base lg:text-lg text-purple-800 font-bold">
+                Today it was easy to use the app to organize my tasks and it helps me improve my performance.
+              </h5>
+            </div>
           </div>
 
           <div className="mt-3 md:mt-4">
@@ -148,15 +150,15 @@ const SurveyBanner: React.FC<SurveyBannerProps> = ({ userId }) => {
               <div className="flex text-center text-xs md:text-sm font-semibold mb-2">
                 {Array.from({ length: 7 }).map((_, i) => (
                   <div key={i} className="flex-1 select-none">
-                    {7 - i}
+                    {i + 1}
                   </div>
                 ))}
               </div>
 
               {/* Color bar with 7 selectable segments laid out horizontally */}
-              <div className="flex rounded-md overflow-hidden flex-nowrap" role="radiogroup" aria-label="Encuesta de satisfacción">
+              <div className="flex rounded-md overflow-hidden flex-nowrap" role="radiogroup" aria-label="Encuesta de satisfacción / Satisfaction survey">
                 {colors.map((c, idx) => {
-                  const value = 7 - idx
+                  const value = idx + 1
                   const selected = surveyValue === value
                   return (
                     <button
@@ -167,7 +169,7 @@ const SurveyBanner: React.FC<SurveyBannerProps> = ({ userId }) => {
                       onClick={() => submitAnswer(value)}
                       className={`flex-1 h-6 lg:h-5 focus:outline-none transform transition duration-150 ease-out hover:scale-105 hover:shadow-lg ${idx === 0 ? 'rounded-l-md' : ''} ${idx === 6 ? 'rounded-r-md' : ''} relative`}
                       style={{ backgroundColor: c, minWidth: 0 }}
-                      title={`${value} - ${idx === 0 ? 'Nada satisfecho' : idx === 6 ? 'Muy satisfecho' : ''}`}
+                      title={`${value} - ${value === 1 ? 'Strongly disagree' : value === 7 ? 'Strongly agree' : ''}`}
                     >
                       {selected && <span className="absolute inset-0 ring-2 ring-white/60" aria-hidden />}
                     </button>
@@ -177,8 +179,8 @@ const SurveyBanner: React.FC<SurveyBannerProps> = ({ userId }) => {
 
               {/* Labels below bar - added extra bottom spacing */}
               <div className="flex justify-between text-xs md:text-sm mt-3 md:mt-4 mb-2 md:mb-4 font-bold text-purple-800">
-                <div className="max-w-[45%] truncate">Totalmente en desacuerdo</div>
-                <div className="max-w-[45%] text-right truncate">Totalmente de acuerdo</div>
+                <div className="max-w-[45%] truncate">Strongly disagree</div>
+                <div className="max-w-[45%] text-right truncate">Strongly agree</div>
               </div>
             </div>
           </div>
