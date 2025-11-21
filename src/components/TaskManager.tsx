@@ -200,16 +200,30 @@ export function TaskManager({ userId, onUpdateTask, onDeleteTask, dataRefreshKey
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'High': return 'destructive'
-      case 'Medium': return 'secondary'
-      case 'Low': return 'outline'
+      case 'Medium': return 'warning'
+      case 'Low': return 'success'
       default: return 'outline'
+    }
+  }
+
+  // Inline style fallback to force visible colors even if CSS overrides occur
+  const priorityInlineStyle = (priority: string) => {
+    switch (priority) {
+      case 'High':
+        return { backgroundColor: '#dc2626', color: '#ffffffff', borderColor: 'transparent' }
+      case 'Medium':
+        return { backgroundColor: '#f59e0b', color: '#ffffff', borderColor: 'transparent' }
+      case 'Low':
+        return { backgroundColor: '#10b981', color: '#ffffff', borderColor: 'transparent' }
+      default:
+        return {}
     }
   }
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'completed': return <CheckCircle className="w-4 h-4 text-green-600" />
-      case 'in-progress': return <PlayCircle className="w-4 h-4 text-blue-600" />
+      case 'Completed': return <CheckCircle className="w-4 h-4 text-green-600" />
+      case 'In Progress': return <PlayCircle className="w-4 h-4 text-blue-600" />
       default: return <Circle className="w-4 h-4 text-gray-400" />
     }
   }
@@ -411,7 +425,9 @@ export function TaskManager({ userId, onUpdateTask, onDeleteTask, dataRefreshKey
                         </TableCell>
                         <TableCell className="font-medium">{task.subject}</TableCell>
                         <TableCell><div className="flex items-center gap-2"><Calendar className="w-4 h-4 text-muted-foreground" /><span className={isOverdue(task) ? 'text-red-600 font-medium' : ''}>{formatDate(task.dueDate)}</span></div></TableCell>
-                        <TableCell><Badge variant={getPriorityColor(task.priority)}>{task.priority}</Badge></TableCell>
+                        <TableCell>
+                          <Badge variant={getPriorityColor(task.priority)} style={priorityInlineStyle(task.priority)}>{task.priority}</Badge>
+                        </TableCell>
                         <TableCell><div className="flex items-center gap-2"><Clock className="w-4 h-4 text-muted-foreground" />{formatTime(task.estimatedTime)}</div></TableCell>
                         <TableCell>
                           <Select value={task.status} onValueChange={(status: string) => handleStatusChange(task.id, status as TaskForUI['status'])}>
@@ -480,7 +496,7 @@ export function TaskManager({ userId, onUpdateTask, onDeleteTask, dataRefreshKey
                       {task.description && <p className="text-sm text-muted-foreground line-clamp-2">{task.description}</p>}
                       <div className="flex flex-wrap gap-2">
                         <Badge variant="outline" className="text-xs">{task.type}</Badge>
-                        <Badge variant={getPriorityColor(task.priority)} className="text-xs">{task.priority}</Badge>
+                        <Badge variant={getPriorityColor(task.priority)} className="text-xs" style={priorityInlineStyle(task.priority)}>{task.priority}</Badge>
                       </div>
                       <div className="flex items-center gap-4 text-sm">
                         <div className="flex items-center gap-1"><Calendar className="w-4 h-4 text-muted-foreground" /><span className={isOverdue(task) ? 'text-red-600 font-medium' : ''}>{formatDate(task.dueDate)}</span></div>
